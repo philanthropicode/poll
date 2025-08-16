@@ -1,21 +1,18 @@
 import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 
 export default function Header({ loggedIn, setLoggedIn }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const navigate = useNavigate();
 
   return (
     <header className="sticky top-0 z-10 border-b bg-white/80 backdrop-blur">
       <div className="mx-auto max-w-5xl">
         <div className="grid grid-cols-3 items-center p-4">
-          {/* Left spacer to keep title centered */}
           <div />
-
-          {/* Centered site title */}
           <h1 className="text-center text-xl font-semibold tracking-tight">
-            Minimalist SPA
+            <Link to="/" className="hover:opacity-80">Minimalist SPA</Link>
           </h1>
-
-          {/* Right-aligned hamburger */}
           <div className="flex justify-end">
             <div className="relative">
               <button
@@ -30,12 +27,7 @@ export default function Header({ loggedIn, setLoggedIn }) {
                   fill="currentColor"
                   className="h-5 w-5"
                 >
-                  <path
-                    d="M4 6h16M4 12h16M4 18h16"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                  />
+                  <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                 </svg>
               </button>
 
@@ -47,26 +39,24 @@ export default function Header({ loggedIn, setLoggedIn }) {
                   <ul className="divide-y">
                     {!loggedIn ? (
                       <li>
-                        <button
-                          className="w-full px-4 py-3 text-left hover:bg-gray-50"
-                          onClick={() => {
-                            setLoggedIn(true);
-                            setMenuOpen(false);
-                          }}
+                        <Link
+                          to="/form"
+                          className="block px-4 py-3 hover:bg-gray-50"
+                          onClick={() => setMenuOpen(false)}
                         >
                           Sign up / Sign in
-                        </button>
+                        </Link>
                       </li>
                     ) : (
                       <>
                         <li>
-                          <a
-                            href="#account"
+                          <Link
+                            to="/profile"
                             className="block px-4 py-3 hover:bg-gray-50"
                             onClick={() => setMenuOpen(false)}
                           >
                             Account
-                          </a>
+                          </Link>
                         </li>
                         <li>
                           <button
@@ -74,6 +64,7 @@ export default function Header({ loggedIn, setLoggedIn }) {
                             onClick={() => {
                               setLoggedIn(false);
                               setMenuOpen(false);
+                              navigate("/");
                             }}
                           >
                             Sign out
