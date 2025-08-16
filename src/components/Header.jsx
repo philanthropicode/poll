@@ -33,7 +33,7 @@ export default function Header() {
                   <ul className="divide-y">
                     {!user ? (
                       <li>
-                        <Link to="/form" className="block px-4 py-3 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>
+                        <Link to="/auth" className="block px-4 py-3 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>
                           Sign up / Sign in
                         </Link>
                       </li>

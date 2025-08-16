@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
-export default function FormPage() {
+export default function AuthPage() {
   const [isSignup, setIsSignup] = useState(false); // default to signin
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
