@@ -1,6 +1,9 @@
 // src/pages/CreatePoll.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { addDoc, collection } from "firebase/firestore";
+import { db } from "../lib/firebase";
+import { useAuth } from "../context/AuthContext";
 
 export default function CreatePollPage() {
   const [title, setTitle] = useState("");
@@ -11,14 +14,13 @@ export default function CreatePollPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
     setSubmitting(true);
     try {
-      // TODO: integrate with your backend / Firestore
-      // For now, just log and return to home
       console.log({
         title,
         state,
@@ -26,6 +28,26 @@ export default function CreatePollPage() {
         zipcode,
         dueDate,
       });
+      // Optional: basic guard in case someone hits the route directly
+      if (!user) {
+        throw new Error("You must be signed in to create a poll.");
+      }
+
+      // Create a new document in "polls"
+      await addDoc(collection(db, "polls"), {
+        title: title.trim(),
+        state: state.trim(),
+        city: city.trim(),
+        zipcode: zipcode.trim(),
+        dueDate, // stored as YYYY-MM-DD (string) from <input type="date">
+      });
+
+      // Reset form and navigate home (or to a detail page later)
+      setTitle("");
+      setState("");
+      setCity("");
+      setZipcode("");
+      setDueDate("");
       navigate("/");
     } catch (err) {
       setError(err?.message || "Something went wrong");
