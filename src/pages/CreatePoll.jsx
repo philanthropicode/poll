@@ -1,7 +1,7 @@
 // src/pages/CreatePoll.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { addDoc, collection } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { useAuth } from "../context/AuthContext";
 
@@ -40,6 +40,8 @@ export default function CreatePollPage() {
         city: city.trim(),
         zipcode: zipcode.trim(),
         dueDate, // stored as YYYY-MM-DD (string) from <input type="date">
+        createdBy: user.uid,
+        createdAt: serverTimestamp(),
       });
 
       // Reset form and navigate home (or to a detail page later)
