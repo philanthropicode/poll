@@ -4,20 +4,24 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Global default: public read, no default writes.
+    // Public read by default
     match /{document=**} {
       allow read: if true;
     }
 
-    // Polls: signed-in users can create; only the creator can update/delete.
     match /polls/{pollId} {
-      allow read: if true;
       allow create: if request.auth != null;
       allow update, delete: if request.auth != null
                             && request.auth.uid == resource.data.createdBy;
-    }
 
-    // Add more per-collection write rules here as needed.
+      // Questions subcollection
+      match /questions/{questionId} {
+        allow read: if true;
+        allow create, update, delete: if request.auth != null
+                                      && request.auth.uid == get(/databases/$(database)/documents/polls/$(pollId)).data.createdBy;
+      }
+    }
   }
 }
+
 ```

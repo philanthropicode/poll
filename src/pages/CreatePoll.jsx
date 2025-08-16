@@ -34,7 +34,7 @@ export default function CreatePollPage() {
       }
 
       // Create a new document in "polls"
-      await addDoc(collection(db, "polls"), {
+      const docRef = await addDoc(collection(db, "polls"), {
         title: title.trim(),
         state: state.trim(),
         city: city.trim(),
@@ -44,13 +44,9 @@ export default function CreatePollPage() {
         createdAt: serverTimestamp(),
       });
 
-      // Reset form and navigate home (or to a detail page later)
-      setTitle("");
-      setState("");
-      setCity("");
-      setZipcode("");
-      setDueDate("");
-      navigate("/");
+      // Reset + go to the new poll
+      setTitle(""); setState(""); setCity(""); setZipcode(""); setDueDate("");
+      navigate(`/polls/${docRef.id}`);
     } catch (err) {
       setError(err?.message || "Something went wrong");
     } finally {
