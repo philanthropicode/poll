@@ -1,9 +1,11 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
-export default function Header({ loggedIn, setLoggedIn }) {
+export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const { user, signout } = useAuth();
 
   return (
     <header className="sticky top-0 z-10 border-b bg-white/80 backdrop-blur">
@@ -21,48 +23,32 @@ export default function Header({ loggedIn, setLoggedIn }) {
                 onClick={() => setMenuOpen((v) => !v)}
               >
                 <span className="sr-only">Menu</span>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  className="h-5 w-5"
-                >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
                   <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                 </svg>
               </button>
 
               {menuOpen && (
-                <nav
-                  className="absolute right-0 mt-2 w-56 overflow-hidden rounded-2xl border bg-white shadow-xl"
-                  onMouseLeave={() => setMenuOpen(false)}
-                >
+                <nav className="absolute right-0 mt-2 w-56 overflow-hidden rounded-2xl border bg-white shadow-xl" onMouseLeave={() => setMenuOpen(false)}>
                   <ul className="divide-y">
-                    {!loggedIn ? (
+                    {!user ? (
                       <li>
-                        <Link
-                          to="/form"
-                          className="block px-4 py-3 hover:bg-gray-50"
-                          onClick={() => setMenuOpen(false)}
-                        >
+                        <Link to="/form" className="block px-4 py-3 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>
                           Sign up / Sign in
                         </Link>
                       </li>
                     ) : (
                       <>
                         <li>
-                          <Link
-                            to="/profile"
-                            className="block px-4 py-3 hover:bg-gray-50"
-                            onClick={() => setMenuOpen(false)}
-                          >
+                          <Link to="/profile" className="block px-4 py-3 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>
                             Account
                           </Link>
                         </li>
                         <li>
                           <button
                             className="w-full px-4 py-3 text-left text-red-600 hover:bg-red-50"
-                            onClick={() => {
-                              setLoggedIn(false);
+                            onClick={async () => {
+                              await signout();
                               setMenuOpen(false);
                               navigate("/");
                             }}
