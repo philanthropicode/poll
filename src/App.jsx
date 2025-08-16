@@ -5,7 +5,8 @@ import Home from "./pages/Home";
 import AuthPage from "./pages/AuthPage";
 import ProfilePage from "./pages/Profile";
 import CreatePollPage from "./pages/CreatePoll";
-import PollDetailPage from "./pages/PollDetail";
+import PollViewPage from "./pages/PollView";
+import PollEditPage from "./pages/PollEdit";
 
 export default function App() {
   return (
@@ -17,7 +18,8 @@ export default function App() {
           <Route path="/auth" element={<AuthPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/polls/new" element={<CreatePollPage />} />
-          <Route path="/polls/:id" element={<PollDetailPage />} />
+          <Route path="/polls/:id" element={<PollViewPage />} />
+          <Route path="/polls/:id/edit" element={<PollEditPage />} />
         </Routes>
       </main>
     </div>

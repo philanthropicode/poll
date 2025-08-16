@@ -22,11 +22,16 @@ export default function Home() {
           <div className="rounded-2xl border p-6">
             <h2 className="text-lg font-semibold">Welcome{user?.email ? `, ${user.email}` : ""}!</h2>
             <p className="text-sm text-gray-600 mt-1">You are signed in.</p>
-            <div className="mt-4">
+            {/* <div className="mt-4">
               <Link
                 to="/polls/new"
                 className="inline-block rounded-xl border px-4 py-2 hover:bg-gray-50"
               >
+                Create a poll
+              </Link>
+            </div> */}
+            <div className="mt-4">
+              <Link to="/polls/new" className="inline-block rounded-xl border px-4 py-2 hover:bg-gray-50">
                 Create a poll
               </Link>
             </div>

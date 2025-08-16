@@ -46,7 +46,7 @@ export default function CreatePollPage() {
 
       // Reset + go to the new poll
       setTitle(""); setState(""); setCity(""); setZipcode(""); setDueDate("");
-      navigate(`/polls/${docRef.id}`);
+      navigate(`/polls/${docRef.id}/edit`);
     } catch (err) {
       setError(err?.message || "Something went wrong");
     } finally {
