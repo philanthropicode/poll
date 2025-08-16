@@ -2,8 +2,9 @@ import React from "react";
 import { Routes, Route } from "react-router-dom";
 import Header from "./components/Header";
 import Home from "./pages/Home";
-import FormPage from "./pages/Form";
+import AuthPage from "./pages/AuthPage";
 import ProfilePage from "./pages/Profile";
+import CreatePollPage from "./pages/CreatePoll";
 
 export default function App() {
   return (
@@ -12,8 +13,9 @@ export default function App() {
       <main className="mx-auto max-w-5xl p-4">
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/form" element={<FormPage />} />
+          <Route path="/auth" element={<AuthPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/polls/new" element={<CreatePollPage />} />
         </Routes>
       </main>
     </div>
