@@ -140,16 +140,11 @@ export default function PollViewPage() {
     setErr(""); setSubmitWorking(true);
     try {
       // Create or update a status document marking the submission completed
-      console.log("Create or update a status document marking the submission completed");
       const statusRef = doc(db, "submissions", statusDocId());
-      console.log("Status document ref:", statusRef.path);
       const existing = await getDocOnce(statusRef);
-      console.log("Existing status document:", existing.exists());
       if (existing.exists()) {
-        console.log("Updating existing status document");
         await updateDoc(statusRef, { submittedAt: serverTimestamp() });
       } else {
-        console.log("Creating new status document");
         await setDoc(statusRef, {
           pollId,
           userId: user.uid,
