@@ -1,9 +1,20 @@
 // src/pages/CreatePoll.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp, Timestamp } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { useAuth } from "../context/AuthContext";
+
+function formatDate(d) {
+  if (!d) return "";
+  const [y, m, day] = d.split("-").map(Number);
+  return new Date(y, m - 1, day).toLocaleDateString();
+}
+
+function endOfDayUTC(dateStr /* 'YYYY-MM-DD' */) {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return Timestamp.fromDate(new Date(Date.UTC(y, m - 1, d, 23, 59, 59, 999)));
+}
 
 export default function CreatePollPage() {
   const [title, setTitle] = useState("");
@@ -40,12 +51,15 @@ export default function CreatePollPage() {
         city: city.trim(),
         zipcode: zipcode.trim(),
         dueDate, // stored as YYYY-MM-DD (string) from <input type="date">
+        dueAt: endOfDayUTC(dueDate),
         createdBy: user.uid,
         createdAt: serverTimestamp(),
       });
 
       // Reset + go to the new poll
       setTitle(""); setState(""); setCity(""); setZipcode(""); setDueDate("");
+
+      // After creating, you land on Edit; that page (see patch below) now has a View button
       navigate(`/polls/${docRef.id}/edit`);
     } catch (err) {
       setError(err?.message || "Something went wrong");
@@ -115,6 +129,9 @@ export default function CreatePollPage() {
             onChange={(e) => setDueDate(e.target.value)}
             required
           />
+          {dueDate && (
+            <p className="mt-1 text-xs text-gray-600">Due: <span className="font-medium">{formatDate(dueDate)}</span></p>
+          )}
         </div>
 
         {error && (

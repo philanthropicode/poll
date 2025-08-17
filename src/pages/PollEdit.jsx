@@ -1,11 +1,18 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import {
   doc, getDoc, updateDoc,
   collection, addDoc, onSnapshot, deleteDoc, serverTimestamp
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { useAuth } from "../context/AuthContext";
+import ShareButton from "../components/ShareButton";
+
+function formatDateStr(d) {
+  if (!d) return "";
+  const [y, m, day] = d.split("-").map(Number);
+  return new Date(y, m - 1, day).toLocaleDateString();
+}
 
 export default function PollEditPage() {
   const { id } = useParams();
@@ -17,6 +24,7 @@ export default function PollEditPage() {
   const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [dueDate, setDueDate] = useState("");
 
   const [questions, setQuestions] = useState([]); // [{id, text, order}]
   const [newQ, setNewQ] = useState("");
@@ -33,6 +41,7 @@ export default function PollEditPage() {
         const data = snap.data();
         setTitle(data.title || "");
         setDescription(data.description || "");
+        setDueDate(data.dueDate || "");
       }
       setLoading(false);
       unsubQ = onSnapshot(questionsRef, (qs) => {
@@ -106,7 +115,20 @@ export default function PollEditPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <h1 className="text-2xl font-semibold">{title || "Untitled Poll"}</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">{title || "Untitled Poll"}</h1>
+        <div className="rounded-xl border p-3 text-sm">
+          {dueDate
+            ? <>Due date: <span className="font-medium">{formatDateStr(dueDate)}</span></>
+            : <span className="text-gray-600">No due date set</span>}
+        </div>
+        <div className="flex items-center gap-2">
+          <ShareButton pollId={id} />
+          <Link to={`/polls/${id}`} className="rounded-xl border px-3 py-1 text-sm hover:bg-gray-50">
+            View
+          </Link>
+        </div>
+      </div>
 
       <section className="rounded-2xl border p-4">
         <h2 className="mb-2 text-lg font-medium">Description</h2>
