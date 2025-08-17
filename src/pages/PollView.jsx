@@ -1,10 +1,19 @@
-import React, { useEffect, useMemo, useState } from "react";
+// src/pages/PollView.jsx
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
-  doc, getDoc, collection, getDocs, setDoc, getDoc as getDocOnce, updateDoc, serverTimestamp, query, where
+  doc, getDoc, collection, getDocs, setDoc, getDoc as getDocOnce, updateDoc, serverTimestamp,
+  query, where
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { useAuth } from "../context/AuthContext";
+import ShareButton from "../components/ShareButton";
+
+function formatDateStr(d) {
+  if (!d) return "";
+  const [y, m, day] = d.split("-").map(Number);
+  return new Date(y, m - 1, day).toLocaleDateString();
+}
 
 export default function PollViewPage() {
   const { id: pollId } = useParams();
@@ -16,30 +25,45 @@ export default function PollViewPage() {
   const [loading, setLoading] = useState(true);
   const [poll, setPoll] = useState(null);
   const [questions, setQuestions] = useState([]); // [{id, text, order}]
-  const [answers, setAnswers] = useState({});     // qid -> { value: number, comment?: string, showComment?: bool }
+  const [answers, setAnswers] = useState({});     // qid -> { value, comment?, showComment? }
   const [savingIds, setSavingIds] = useState({}); // qid -> boolean
   const [submitWorking, setSubmitWorking] = useState(false);
   const [err, setErr] = useState("");
+  const [submittedAt, setSubmittedAt] = useState(null); // Timestamp | Date | null
 
-  // Load poll and questions, seed default answers, then hydrate from submissions if logged in
+  // Keep latest answers available to event handlers
+  const answersRef = useRef(answers);
+  useEffect(() => { answersRef.current = answers; }, [answers]);
+
+  // helpers for display
+  function formatDateStr(d /* 'YYYY-MM-DD' */) {
+    if (!d) return "";
+    const [y, m, day] = d.split("-").map(Number);
+    return new Date(y, m - 1, day).toLocaleDateString();
+  }
+
+  function formatWhen(ts) {
+    if (!ts) return "";
+    const d = ts?.toDate ? ts.toDate() : (ts instanceof Date ? ts : null);
+    return d ? d.toLocaleString() : "";
+  }
+
+  // Load poll + questions; hydrate existing user submissions
   useEffect(() => {
     (async () => {
       const snap = await getDoc(pollRef);
-      if (snap.exists()) {
-        setPoll({ id: snap.id, ...snap.data() });
-      }
+      if (snap.exists()) setPoll({ id: snap.id, ...snap.data() });
+
       const qsSnap = await getDocs(questionsRef);
       const items = [];
       qsSnap.forEach((d) => items.push({ id: d.id, ...(d.data() || {}) }));
       items.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
       setQuestions(items);
 
-      // initialize sliders to 0 (center)
+      // seed defaults
       const seed = {};
       items.forEach((q) => { seed[q.id] = { value: 0, showComment: false }; });
-      setAnswers(seed);
-
-      // If logged in, fetch existing submissions for this poll/user and hydrate
+      // hydrate from user's submissions if signed in
       if (user) {
         const qSub = query(
           collection(db, "submissions"),
@@ -47,25 +71,30 @@ export default function PollViewPage() {
           where("userId", "==", user.uid)
         );
         const subsSnap = await getDocs(qSub);
-        const hydrated = { ...seed };
         subsSnap.forEach((d) => {
           const data = d.data() || {};
           if (!data.questionId) return; // ignore status doc
-          hydrated[data.questionId] = {
+          seed[data.questionId] = {
             value: typeof data.value === "number" ? data.value : 0,
             comment: data.comment ?? "",
             showComment: !!(data.comment && String(data.comment).length > 0),
           };
         });
-        setAnswers(hydrated);
-      }
 
+        // load submission status (submittedAt) if present
+        const statusRef = doc(db, "submissions", `${pollId}__${user.uid}__status`);
+        const statusSnap = await getDoc(statusRef);
+        if (statusSnap.exists()) {
+          const s = statusSnap.data() || {};
+          if (s.submittedAt) setSubmittedAt(s.submittedAt);
+        }
+      }
+      setAnswers(seed);
       setLoading(false);
     })();
   }, [pollRef, questionsRef, user, pollId]);
 
   function submissionDocIdFor(qid) {
-    // deterministic per-question doc so updates overwrite
     return `${pollId}__${user.uid}__${qid}`;
   }
   function statusDocId() {
@@ -86,12 +115,9 @@ export default function PollViewPage() {
         value: next.value,
         updatedAt: serverTimestamp(),
       };
-      if (next.comment && next.comment.trim().length > 0) {
-        payload.comment = next.comment.trim();
-      } else {
-        // Ensure comment is removed if cleared
-        payload.comment = null;
-      }
+      payload.comment =
+        next.comment && next.comment.trim().length > 0 ? next.comment.trim() : null;
+
       await setDoc(doc(db, "submissions", submissionDocIdFor(qid)), payload, { merge: true });
     } catch (e) {
       setErr(e.message || "Failed to save response");
@@ -100,23 +126,37 @@ export default function PollViewPage() {
     }
   }
 
-  async function handleSlider(qid, value) {
+  // Slider: update UI only; save on release & on exit/submit
+  function handleSlider(qid, value) {
     const v = Number(value);
-    setAnswers((prev) => {
-      const next = { ...prev[qid], value: v };
-      // fire-and-forget save
-      persistAnswer(qid, next);
-      return { ...prev, [qid]: next };
-    });
+    setAnswers((prev) => ({ ...prev, [qid]: { ...prev[qid], value: v } }));
+  }
+  function saveOneFromState(qid) {
+    const latest = answersRef.current[qid];
+    if (latest) persistAnswer(qid, latest);
+  }
+  function saveAllFromState() {
+    const a = answersRef.current || {};
+    Object.keys(a).forEach((qid) => persistAnswer(qid, a[qid]));
   }
 
+  // Save any in-memory changes if we leave this route
+  useEffect(() => {
+    return () => {
+      saveAllFromState();
+    };
+  }, []);
+
+  // Comment helpers
   function addComment(qid) {
-    setAnswers((prev) => ({ ...prev, [qid]: { ...prev[qid], showComment: true, comment: prev[qid]?.comment ?? "" } }));
+    setAnswers((prev) => ({
+      ...prev,
+      [qid]: { ...prev[qid], showComment: true, comment: prev[qid]?.comment ?? "" },
+    }));
   }
   function removeComment(qid) {
     setAnswers((prev) => {
       const next = { ...prev[qid], showComment: false, comment: "" };
-      // also clear in Firestore
       persistAnswer(qid, next);
       return { ...prev, [qid]: next };
     });
@@ -128,10 +168,10 @@ export default function PollViewPage() {
     });
   }
   async function blurComment(qid) {
-    // save comment on blur
-    await persistAnswer(qid, answers[qid]);
+    await persistAnswer(qid, answersRef.current[qid]);
   }
 
+  // Submit: save all latest first, then write status doc
   async function submitAll() {
     if (!user) {
       setErr("Please sign in to submit.");
@@ -139,7 +179,9 @@ export default function PollViewPage() {
     }
     setErr(""); setSubmitWorking(true);
     try {
-      // Create or update a status document marking the submission completed
+      const qids = Object.keys(answersRef.current || {});
+      await Promise.all(qids.map((qid) => persistAnswer(qid, answersRef.current[qid])));
+
       const statusRef = doc(db, "submissions", statusDocId());
       const existing = await getDocOnce(statusRef);
       if (existing.exists()) {
@@ -152,6 +194,8 @@ export default function PollViewPage() {
           submittedAt: serverTimestamp(),
         });
       }
+      // reflect immediately in UI
+      setSubmittedAt(new Date());
     } catch (e) {
       setErr(e.message || "Failed to submit");
     } finally {
@@ -166,14 +210,23 @@ export default function PollViewPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      {/* Title + Edit if creator */}
+      {/* Title + Share (+ Edit if creator) */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">{poll.title || "Untitled Poll"}</h1>
-        {isOwner && (
-          <Link to={`/polls/${pollId}/edit`} className="rounded-xl border px-3 py-1 text-sm hover:bg-gray-50">
-            Edit
-          </Link>
-        )}
+        <div className="rounded-xl border p-3 text-sm">
+          {poll?.dueDate
+            ? <>Due date: <span className="font-medium">{formatDateStr(poll.dueDate)}</span></>
+            : <span className="text-gray-600">No due date set</span>}
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <ShareButton pollId={pollId} />
+          {isOwner && (
+            <Link to={`/polls/${pollId}/edit`} className="rounded-xl border px-3 py-1 text-sm hover:bg-gray-50">
+              Edit
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* Description */}
@@ -208,6 +261,8 @@ export default function PollViewPage() {
                     value={a.value}
                     disabled={!user}
                     onChange={(e) => handleSlider(q.id, e.target.value)}
+                    onMouseUp={() => saveOneFromState(q.id)}
+                    onTouchEnd={() => saveOneFromState(q.id)}
                     className="flex-1"
                   />
                   <span className="text-xs w-6">10</span>
