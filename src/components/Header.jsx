@@ -13,7 +13,7 @@ export default function Header() {
         <div className="grid grid-cols-3 items-center p-4">
           <div />
           <h1 className="text-center text-xl font-semibold tracking-tight">
-            <Link to="/" className="hover:opacity-80">Minimalist SPA</Link>
+            <Link to="/" className="hover:opacity-80">Philanthropicode</Link>
           </h1>
           <div className="flex justify-end">
             <div className="relative">
@@ -31,6 +31,11 @@ export default function Header() {
               {menuOpen && (
                 <nav className="absolute right-0 mt-2 w-56 overflow-hidden rounded-2xl border bg-white shadow-xl" onMouseLeave={() => setMenuOpen(false)}>
                   <ul className="divide-y">
+                    <li>
+                      <Link to="/about" className="block px-4 py-3 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>
+                        About
+                      </Link>
+                    </li>
                     {!user ? (
                       <li>
                         <Link to="/auth" className="block px-4 py-3 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>
