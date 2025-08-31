@@ -1,0 +1,67 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function pollDoc(pollId) {
+      return get(/databases/$(database)/documents/polls/$(pollId));
+    }
+    function isOwner(pollId) {
+      return isSignedIn() && pollDoc(pollId).data.createdBy == request.auth.uid;
+    }
+    // A poll is open if it has no dueAt OR now < dueAt
+    function pollOpen(pollId) {
+      let p = pollDoc(pollId);
+      return !('dueAt' in p.data) || request.time < p.data.dueAt;
+    }
+
+    // --- Polls ---
+    match /polls/{pollId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+
+      // Owner can update, but cannot change dueDate/dueAt once created.
+      // (No pollOpen check here so the owner may still edit title/description after the due date if you want.)
+      allow update: if isOwner(pollId)
+                    && (!('dueDate' in request.resource.data) || request.resource.data.dueDate == resource.data.dueDate)
+                    && (!('dueAt'   in request.resource.data) || request.resource.data.dueAt   == resource.data.dueAt);
+
+      match /questions/{questionId} {
+        allow read: if true;
+
+        // Questions may only be written while the poll is open (and by the owner).
+        allow create, update, delete: if isOwner(pollId) && pollOpen(pollId);
+      }
+    }
+
+    // --- Submissions (per-user answers & status) ---
+    match /submissions/{docId} {
+      allow read: if true;
+
+      // Create: must belong to the signer, must specify pollId, and the poll must be open.
+      allow create: if isSignedIn()
+                    && request.resource.data.userId == request.auth.uid
+                    && ('pollId' in request.resource.data)
+                    && pollOpen(request.resource.data.pollId);
+
+      // Update: signer must own the doc, may not change ownership/identity fields,
+      // and the poll must still be open.
+      allow update: if isSignedIn()
+                    && resource.data.userId == request.auth.uid
+                    // don't allow changing these keys
+                    && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
+                    && (!('pollId' in request.resource.data) || request.resource.data.pollId == resource.data.pollId)
+                    && (!('questionId' in request.resource.data) || request.resource.data.questionId == resource.data.questionId)
+                    && pollOpen(resource.data.pollId);
+    }
+    
+    // --- Profiles ---
+    match /profiles/{uid} {
+      allow read: if isSignedIn() && request.auth.uid == uid; // or `if true` if you want public
+      allow create, update: if isSignedIn() && request.auth.uid == uid;
+    }
+  }
+}

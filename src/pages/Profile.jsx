@@ -1,19 +1,125 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
+import { db } from "../lib/firebase";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+
+function normalizeState(s = "") {
+  return s.trim().slice(0, 2).toUpperCase(); // e.g. "tx" -> "TX"
+}
+function normalizeZip(z = "") {
+  const digits = String(z).replace(/\D/g, "");
+  return digits.padStart(5, "0").slice(0, 5); // keep 5-digit ZIP
+}
 
 export default function ProfilePage() {
   const { user } = useAuth();
+  const [city, setCity] = useState("");
+  const [stateAbbr, setStateAbbr] = useState("");
+  const [zip, setZip] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    let ignore = false;
+    (async () => {
+      if (!user) { setLoading(false); return; }
+      try {
+        const snap = await getDoc(doc(db, "profiles", user.uid));
+        if (snap.exists() && !ignore) {
+          const p = snap.data() || {};
+          setCity(p.city || "");
+          setStateAbbr(p.state || "");
+          setZip(p.zip || "");
+        }
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    })();
+    return () => { ignore = true; };
+  }, [user]);
+
+  async function handleSave(e) {
+    e.preventDefault();
+    if (!user) return;
+    setErr(""); setSaved(false); setSaving(true);
+    try {
+      const payload = {
+        city: city.trim(),
+        state: normalizeState(stateAbbr),
+        zip: normalizeZip(zip),
+        updatedAt: serverTimestamp(),
+      };
+      await setDoc(doc(db, "profiles", user.uid), payload, { merge: true });
+      setSaved(true);
+    } catch (e) {
+      setErr(e.message || "Failed to save profile");
+    } finally {
+      setSaving(false);
+      setTimeout(() => setSaved(false), 2000);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-xl space-y-4">
       <h2 className="text-xl font-semibold">Your Profile</h2>
+
       <div className="rounded-2xl border p-4">
-        {user ? (
-          <>
-            <p className="text-sm">Email: <span className="font-medium">{user.email}</span></p>
-            <p className="text-xs text-gray-600 mt-1">UID: {user.uid}</p>
-          </>
-        ) : (
+        {!user ? (
           <p className="text-sm text-gray-600">You are not signed in.</p>
+        ) : loading ? (
+          <p className="text-sm text-gray-600">Loading…</p>
+        ) : (
+          <>
+            <p className="text-sm mb-3">
+              Email: <span className="font-medium">{user.email}</span>
+            </p>
+            <form className="space-y-3" onSubmit={handleSave}>
+              <div>
+                <label className="mb-1 block text-sm">City</label>
+                <input
+                  className="w-full rounded-xl border px-3 py-2"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  placeholder="e.g., Austin"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-sm">State (2-letter)</label>
+                  <input
+                    className="w-full rounded-xl border px-3 py-2"
+                    value={stateAbbr}
+                    onChange={(e) => setStateAbbr(e.target.value)}
+                    placeholder="e.g., TX"
+                    maxLength={2}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm">ZIP code</label>
+                  <input
+                    className="w-full rounded-xl border px-3 py-2"
+                    value={zip}
+                    inputMode="numeric"
+                    onChange={(e) => setZip(e.target.value)}
+                    placeholder="e.g., 73301"
+                  />
+                </div>
+              </div>
+
+              {err && (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-2 text-sm text-red-700">{err}</div>
+              )}
+              <div className="flex items-center gap-3">
+                <button type="submit" disabled={saving} className="rounded-xl border px-4 py-2 hover:bg-gray-50">
+                  {saving ? "Saving…" : "Save"}
+                </button>
+                {saved && <span className="text-xs text-green-700">Saved</span>}
+              </div>
+            </form>
+            <p className="text-xs text-gray-600 mt-3">UID: {user.uid}</p>
+          </>
         )}
       </div>
     </div>
