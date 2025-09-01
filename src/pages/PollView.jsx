@@ -30,6 +30,29 @@ export default function PollViewPage() {
   const [submitWorking, setSubmitWorking] = useState(false);
   const [err, setErr] = useState("");
   const [submittedAt, setSubmittedAt] = useState(null); // Timestamp | Date | null
+  // state to hold a normalized snapshot of the user's profile location
+  const [profileLoc, setProfileLoc] = useState(null);
+
+  // simple normalizers
+  function normState(s = "") { return s.trim().slice(0, 2).toUpperCase() || null; }
+  function normZip(z = "") {
+    const digits = String(z).replace(/\D/g, "");
+    return digits ? digits.padStart(5, "0").slice(0, 5) : null;
+  }
+
+  // load once when the user is known
+  useEffect(() => {
+    (async () => {
+      if (!user) { setProfileLoc(null); return; }
+      const snap = await getDoc(doc(db, "profiles", user.uid));
+      const p = snap.data() || {};
+      setProfileLoc({
+        city: (p.city || "").trim() || null,
+        state: normState(p.state || ""),
+        zip: normZip(p.zip || ""),
+      });
+    })();
+  }, [user]);
 
   // Keep latest answers available to event handlers
   const answersRef = useRef(answers);
@@ -108,12 +131,19 @@ export default function PollViewPage() {
     }
     setSavingIds((s) => ({ ...s, [qid]: true }));
     try {
+      // include only non-null location fields
+      const loc = {};
+      if (profileLoc?.city)  loc.city  = profileLoc.city;
+      if (profileLoc?.state) loc.state = profileLoc.state;
+      if (profileLoc?.zip)   loc.zip   = profileLoc.zip;
+      
       const payload = {
         pollId,
         userId: user.uid,
         questionId: qid,
         value: next.value,
         updatedAt: serverTimestamp(),
+        ...loc,
       };
       payload.comment =
         next.comment && next.comment.trim().length > 0 ? next.comment.trim() : null;
