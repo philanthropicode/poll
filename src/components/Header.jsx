@@ -45,11 +45,6 @@ export default function Header() {
                       </Link>
                     </li>
                     <li>
-                      <Link to="/feedback" className="block px-4 py-3 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>
-                        Feedback
-                      </Link>
-                    </li>
-                    <li>
                       <Link to="/about" className="block px-4 py-3 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>
                         About
                       </Link>
