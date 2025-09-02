@@ -5,9 +5,6 @@ import {
   collection, doc, serverTimestamp, writeBatch, increment
 } from "firebase/firestore";
 import { Link, useLocation } from "react-router-dom";
-import { setLogLevel } from "firebase/firestore";
-setLogLevel('debug');
-
 
 export default function FeedbackPage() {
   const { user } = useAuth();
