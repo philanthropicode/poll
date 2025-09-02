@@ -12,6 +12,9 @@ service cloud.firestore {
     function isOwner(pollId) {
       return isSignedIn() && pollDoc(pollId).data.createdBy == request.auth.uid;
     }
+    function isAdmin() {
+    	return isSignedIn() && request.auth.token.admin == true;
+    }
     // A poll is open if it has no dueAt OR now < dueAt
     function pollOpen(pollId) {
       let p = pollDoc(pollId);
@@ -38,6 +41,12 @@ service cloud.firestore {
     }
 
     // --- Submissions (per-user answers & status) ---
+    // function noClientLocationFields() {
+    //   return !('city' in request.resource.data)
+    //       && !('state' in request.resource.data)
+    //       && !('zip' in request.resource.data);
+    // }
+    
     match /submissions/{docId} {
       allow read: if true;
 
@@ -46,6 +55,7 @@ service cloud.firestore {
                     && request.resource.data.userId == request.auth.uid
                     && ('pollId' in request.resource.data)
                     && pollOpen(request.resource.data.pollId);
+                    // && noClientLocationFields();
 
       // Update: signer must own the doc, may not change ownership/identity fields,
       // and the poll must still be open.
@@ -56,6 +66,7 @@ service cloud.firestore {
                     && (!('pollId' in request.resource.data) || request.resource.data.pollId == resource.data.pollId)
                     && (!('questionId' in request.resource.data) || request.resource.data.questionId == resource.data.questionId)
                     && pollOpen(resource.data.pollId);
+                    // && noClientLocationFields();
     }
     
     // --- Profiles ---
@@ -63,5 +74,42 @@ service cloud.firestore {
       allow read: if isSignedIn() && request.auth.uid == uid; // or `if true` if you want public
       allow create, update: if isSignedIn() && request.auth.uid == uid;
     }
-  }
+    
+    // path helper
+    function ratePath(uid) {
+      return /databases/$(database)/documents/feedback_ratelimits/$(uid);
+    }
+
+    match /feedback/{id} {
+      // Must be signed in AND the batch must also write the rate doc
+      // Create only if signed-in AND rate-limit conditions are satisfied.
+      allow create: if isSignedIn() && existsAfter(ratePath(request.auth.uid));
+      // Reading feedback: keep as you prefer, it's your choice (admin-only, or owner-only, etc.)
+      // Example admin-only:
+      allow read: if isAdmin(); // define isAdmin() if you need this
+      allow update, delete: if false;
+    }
+
+		// Per-user rate metadata for feedback (not publicly readable)
+    match /feedback_ratelimits/{uid} {
+      // private
+      allow read: if false;
+
+      // Signed-in user can update/create their own rate doc,
+      // *but* only if cooldown is satisfied.
+      allow create, update: if isSignedIn()
+                            && request.auth.uid == uid
+                            && (
+                                 // first message ever
+                                 !exists(ratePath(uid))
+                                 // or previous doc lacked lastAt (legacy/cleanup)
+                                 || !('lastAt' in get(ratePath(uid)).data)
+                                 // otherwise enforce 30s gap
+                                 || request.time > get(ratePath(uid)).data.lastAt + duration.value(30, 's')
+                               );
+
+      allow delete: if false;
+    }
+
+	}
 }

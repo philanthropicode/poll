@@ -9,6 +9,7 @@ import AboutPage from "./pages/About";
 import CreatePollPage from "./pages/CreatePoll";
 import PollViewPage from "./pages/PollView";
 import PollEditPage from "./pages/PollEdit";
+import FeedbackPage from "./pages/Feedback";
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
           <Route path="/polls/new" element={<CreatePollPage />} />
           <Route path="/polls/:id" element={<PollViewPage />} />
           <Route path="/polls/:id/edit" element={<PollEditPage />} />
+          <Route path="/feedback" element={<FeedbackPage />} />
         </Routes>
       </main>
       <Footer siteName="Dario Bianco" />

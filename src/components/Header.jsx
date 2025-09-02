@@ -1,11 +1,14 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, signout } = useAuth();
+  const match = location.pathname.match(/^\/polls\/([^/]+)/);
+  const currentPollId = match ? match[1] : null;
 
   return (
     <header className="sticky top-0 z-10 border-b bg-white/80 backdrop-blur">
@@ -31,6 +34,21 @@ export default function Header() {
               {menuOpen && (
                 <nav className="absolute right-0 mt-2 w-56 overflow-hidden rounded-2xl border bg-white shadow-xl" onMouseLeave={() => setMenuOpen(false)}>
                   <ul className="divide-y">
+                    <li>
+                      <Link
+                        to="/feedback"
+                        state={{ pollId: currentPollId }}
+                        className="block px-4 py-3 hover:bg-gray-50"
+                        onClick={() => setMenuOpen(false)}
+                      >
+                        Feedback
+                      </Link>
+                    </li>
+                    <li>
+                      <Link to="/feedback" className="block px-4 py-3 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>
+                        Feedback
+                      </Link>
+                    </li>
                     <li>
                       <Link to="/about" className="block px-4 py-3 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>
                         About
