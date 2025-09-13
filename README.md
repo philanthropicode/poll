@@ -115,3 +115,136 @@ Repository: https://github.com/philanthropicode/poll
 
 ## Project Structure (high-level)
 
+```
+src/
+  components/    # Header, Footer, Hero, ShareButton
+  context/       # AuthContext (Firebase Auth)
+  lib/           # firebase.js (Firebase init, Firestore cache)
+  pages/         # Home, About, Auth (Form), CreatePoll, PollView, PollEdit, Profile, Feedback, Donate
+App.jsx          # Routes + layout
+main.jsx         # App bootstrap with BrowserRouter and AuthProvider
+```
+
+---
+
+## Routes
+
+- `/` — Home (recent polls, hero/welcome)
+- `/form` — Sign in / Sign up
+- `/profile` — User profile (city/state/ZIP)
+- `/about` — About the project
+- `/polls/new` — Create a new poll
+- `/polls/:id` — View/answer a poll
+- `/polls/:id/edit` — Edit a poll
+- `/feedback` — Feedback page (rate-limited)
+- `/donate` — Donation info
+
+---
+
+## Getting Started
+
+**Prerequisites:** Node.js 18+
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Environment variables:  
+Copy `.env.template` to `.env` and fill with your Firebase config.
+
+```
+VITE_FIREBASE_API_KEY=your-key
+VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your-project
+VITE_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=1234567890
+VITE_FIREBASE_APP_ID=1:123:web:abc
+VITE_FIREBASE_MEASUREMENT_ID=G-XXXX
+```
+
+Start dev server:
+
+```bash
+npm run dev
+```
+
+Vite prints the local URL (e.g. http://localhost:5173).
+
+---
+
+## Scripts
+
+- `dev` — start Vite dev server
+- `build` — production build
+- `preview` — preview production build locally
+- `lint` — run ESLint
+
+Examples:
+
+```bash
+npm run build
+npm run preview
+npm run lint
+```
+
+---
+
+## Firebase notes
+
+- Firebase init in `src/lib/firebase.js`  
+  We use **persistent local cache** for Firestore to speed up reloads.
+- `AuthContext` exposes `{ user, loading, signin, signup, signout }`.
+- **Hosting headers**:  
+  - `index.html` → `Cache-Control: no-store`  
+  - Hashed assets (`.js/.css/.svg/.woff2/...`) → `Cache-Control: public, max-age=31536000, immutable`  
+    Commit these in `firebase.json`.
+
+---
+
+## Deployment
+
+This repo includes `firebase.json` and `.firebaserc` for Firebase Hosting.
+
+Typical flow:
+
+```bash
+npm run build
+# ensure Firebase CLI is installed and you are logged in
+# npm i -g firebase-tools
+# firebase login
+firebase deploy
+```
+
+---
+
+## Roadmap / Work to be done
+
+High-level priorities (see Kanban for details):
+
+- **Quadratic budget on sliders** (respect a per-poll budget; enforce with UX + validation)
+- **Maps & communities:** heat maps; user self-select community/district
+- **Server-side stamping** of location on submissions (Cloud Function)
+- **Analytics export** (warehouse + dashboards)
+- **Private polls / org workspaces / CSV export** (candidate “Pro” features)
+- **Moderation & spam controls** (feedback, abusive comments)
+
+Kanban: https://github.com/orgs/philanthropicode/projects/1
+
+---
+
+## Contributing
+
+Issues and PRs are welcome. Please open an issue to discuss substantial changes before a PR.
+
+---
+
+## License
+
+No license specified. All rights reserved unless a license is added in the future.
+
+---
+
+Live App: https://app.philanthropicode.com  
+Substack: https://whodowewanttobe.substack.com/
