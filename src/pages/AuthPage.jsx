@@ -86,7 +86,7 @@ export default function AuthPage() {
                   setIsSignup(true);
                 }}
               >
-                Need an account? Sign up
+                New here? Sign up
               </a>
               <button type="submit" disabled={working} className="rounded-xl border px-4 py-2 hover:bg-gray-50">
                 {working ? "Signing in..." : "Sign in"}
