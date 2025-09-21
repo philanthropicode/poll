@@ -59,7 +59,7 @@ export default function AuthPage() {
         {error && (
           <div className="rounded-xl border border-red-200 bg-red-50 p-2 text-sm text-red-700">{error}</div>
         )}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center gap-10">
           {isSignup ? (
             <>
               <a
@@ -86,7 +86,7 @@ export default function AuthPage() {
                   setIsSignup(true);
                 }}
               >
-                New here? Sign up
+                Need an account? Sign up
               </a>
               <button type="submit" disabled={working} className="rounded-xl border px-4 py-2 hover:bg-gray-50">
                 {working ? "Signing in..." : "Sign in"}
