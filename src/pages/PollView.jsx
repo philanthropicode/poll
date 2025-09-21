@@ -8,6 +8,7 @@ import {
 import { db } from "../lib/firebase";
 import { useAuth } from "../context/AuthContext";
 import ShareButton from "../components/ShareButton";
+import PollDescription from "../components/PollDescription";
 
 function formatDateStr(d) {
   if (!d) return "";
@@ -263,7 +264,7 @@ export default function PollViewPage() {
       {poll.description && (
         <section className="rounded-2xl border p-4">
           <h2 className="mb-2 text-lg font-medium">About</h2>
-          <p className="text-sm">{poll.description}</p>
+          <PollDescription description={poll.description} />
         </section>
       )}
 
