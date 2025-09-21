@@ -7,6 +7,8 @@ import {
 import { db } from "../lib/firebase";
 import { useAuth } from "../context/AuthContext";
 import ShareButton from "../components/ShareButton";
+import SimpleMDE from "react-simplemde-editor";
+import "easymde/dist/easymde.min.css";
 
 function formatDateStr(d) {
   if (!d) return "";
@@ -133,11 +135,10 @@ export default function PollEditPage() {
       <section className="rounded-2xl border p-4">
         <h2 className="mb-2 text-lg font-medium">Description</h2>
         <form onSubmit={handleSaveDescription} className="space-y-3">
-          <textarea
-            className="min-h-[100px] w-full rounded-xl border px-3 py-2"
-            placeholder="Write a short description..."
+          <SimpleMDE
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={setDescription}
+            options={{ spellChecker: false, status: false }}
           />
           <button type="submit" className="rounded-xl border px-4 py-2 hover:bg-gray-50" disabled={saving}>
             {saving ? "Saving..." : "Save"}
