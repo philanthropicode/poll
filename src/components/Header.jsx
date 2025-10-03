@@ -6,7 +6,7 @@ export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, signout } = useAuth();
+  const { user, signout, refreshClaims } = useAuth();
   const match = location.pathname.match(/^\/polls\/([^/]+)/);
   const currentPollId = match ? match[1] : null;
 
@@ -35,6 +35,16 @@ export default function Header() {
                 <nav className="absolute right-0 mt-2 w-56 overflow-hidden rounded-2xl border bg-white shadow-xl" onMouseLeave={() => setMenuOpen(false)}>
                   <ul className="divide-y">
                     <li>
+                      <Link to="/about" className="block px-4 py-3 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>
+                        About
+                      </Link>
+                    </li>
+                    <li>
+                      <Link to="/donate" className="block px-4 py-3 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>
+                        Donate
+                      </Link>
+                    </li>
+                    <li>
                       <Link
                         to="/feedback"
                         state={{ pollId: currentPollId }}
@@ -42,11 +52,6 @@ export default function Header() {
                         onClick={() => setMenuOpen(false)}
                       >
                         Feedback
-                      </Link>
-                    </li>
-                    <li>
-                      <Link to="/about" className="block px-4 py-3 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>
-                        About
                       </Link>
                     </li>
                     {!user ? (
@@ -57,6 +62,16 @@ export default function Header() {
                       </li>
                     ) : (
                       <>
+                       {!user?.claims?.admin && (
+                         <li>
+                           <button
+                             className="w-full px-4 py-3 text-left hover:bg-gray-50"
+                             onClick={async () => { await refreshClaims(); setMenuOpen(false); }}
+                           >
+                             Refresh admin access
+                           </button>
+                         </li>
+                       )}
                         <li>
                           <Link to="/profile" className="block px-4 py-3 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>
                             Account

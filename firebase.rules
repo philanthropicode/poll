@@ -20,6 +20,17 @@ service cloud.firestore {
       let p = pollDoc(pollId);
       return !('dueAt' in p.data) || request.time < p.data.dueAt;
     }
+    function isPollAdmin(pollId) {
+      let p = pollDoc(pollId);
+      // Treat owner or global admin as poll admin
+      let ownerOrGlobal = isAdmin() || (isSignedIn() && p.data.createdBy == request.auth.uid);
+      // If you store admins as an ARRAY of UIDs: ["uid1","uid2",...]
+      let arrayListed = ('admins' in p.data) && p.data.admins.hasAny([request.auth.uid]);
+      // If you store admins as a MAP of { uid: true }
+      let mapListed = ('adminsMap' in p.data) && (request.auth.uid in p.data.adminsMap);
+      return ownerOrGlobal || arrayListed || mapListed;
+    }
+
 
     // --- Polls ---
     match /polls/{pollId} {
@@ -47,26 +58,42 @@ service cloud.firestore {
     //       && !('zip' in request.resource.data);
     // }
     
-    match /submissions/{docId} {
-      allow read: if true;
+//     match /submissions/{docId} {
+//       allow read: if true;
 
-      // Create: must belong to the signer, must specify pollId, and the poll must be open.
+//       // Create: must belong to the signer, must specify pollId, and the poll must be open.
+//       allow create: if isSignedIn()
+//                     && request.resource.data.userId == request.auth.uid
+//                     && ('pollId' in request.resource.data)
+//                     && pollOpen(request.resource.data.pollId);
+//                     // && noClientLocationFields();
+
+//       // Update: signer must own the doc, may not change ownership/identity fields,
+//       // and the poll must still be open.
+//       allow update: if isSignedIn()
+//                     && resource.data.userId == request.auth.uid
+//                     // don't allow changing these keys
+//                     && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
+//                     && (!('pollId' in request.resource.data) || request.resource.data.pollId == resource.data.pollId)
+//                     && (!('questionId' in request.resource.data) || request.resource.data.questionId == resource.data.questionId)
+//                     && pollOpen(resource.data.pollId);
+//                     // && noClientLocationFields();
+//     }
+    match /submissions/{docId} {
+      allow read: if isSignedIn() &&
+                  (resource.data.userId == request.auth.uid || isPollAdmin(resource.data.pollId));
+
       allow create: if isSignedIn()
                     && request.resource.data.userId == request.auth.uid
                     && ('pollId' in request.resource.data)
-                    && pollOpen(request.resource.data.pollId);
-                    // && noClientLocationFields();
+                    && ( !('dueAt' in pollDoc(request.resource.data.pollId).data) || request.time < pollDoc(request.resource.data.pollId).data.dueAt );
 
-      // Update: signer must own the doc, may not change ownership/identity fields,
-      // and the poll must still be open.
       allow update: if isSignedIn()
                     && resource.data.userId == request.auth.uid
-                    // don't allow changing these keys
                     && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
                     && (!('pollId' in request.resource.data) || request.resource.data.pollId == resource.data.pollId)
                     && (!('questionId' in request.resource.data) || request.resource.data.questionId == resource.data.questionId)
-                    && pollOpen(resource.data.pollId);
-                    // && noClientLocationFields();
+                    && ( !('dueAt' in pollDoc(resource.data.pollId).data) || request.time < pollDoc(resource.data.pollId).data.dueAt );
     }
     
     // --- Profiles ---
