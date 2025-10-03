@@ -10,6 +10,8 @@ import CreatePollPage from "./pages/CreatePoll";
 import PollViewPage from "./pages/PollView";
 import PollEditPage from "./pages/PollEdit";
 import FeedbackPage from "./pages/Feedback";
+import RequireAuth from "./routes/RequireAuth";
+import PollAdminPage from "./pages/PollAdmin";
 
 export default function App() {
   return (
@@ -25,6 +27,12 @@ export default function App() {
           <Route path="/polls/:id" element={<PollViewPage />} />
           <Route path="/polls/:id/edit" element={<PollEditPage />} />
           <Route path="/feedback" element={<FeedbackPage />} />
+          <Route path="/donate" element={<DonatePage />} />
+          <Route path="/polls/:id/admin" element={
+            <RequireAuth>
+              <PollAdminPage />
+            </RequireAuth>
+          } />
         </Routes>
       </main>
       <Footer siteName="Dario Bianco" />
