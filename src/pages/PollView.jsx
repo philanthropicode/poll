@@ -9,11 +9,18 @@ import { db } from "../lib/firebase";
 import { useAuth } from "../context/AuthContext";
 import ShareButton from "../components/ShareButton";
 import PollDescription from "../components/PollDescription";
+import { exportPollCsv } from "../lib/callables";
 
+// helpers
 function formatDateStr(d) {
   if (!d) return "";
   const [y, m, day] = d.split("-").map(Number);
   return new Date(y, m - 1, day).toLocaleDateString();
+}
+function formatWhen(ts) {
+  if (!ts) return "";
+  const d = ts?.toDate ? ts.toDate() : (ts instanceof Date ? ts : null);
+  return d ? d.toLocaleString() : "";
 }
 
 export default function PollViewPage() {
@@ -31,17 +38,21 @@ export default function PollViewPage() {
   const [submitWorking, setSubmitWorking] = useState(false);
   const [err, setErr] = useState("");
   const [submittedAt, setSubmittedAt] = useState(null); // Timestamp | Date | null
-  // state to hold a normalized snapshot of the user's profile location
-  const [profileLoc, setProfileLoc] = useState(null);
+  const [hasSubmitted, setHasSubmitted] = useState(false);
 
-  // simple normalizers
-  function normState(s = "") { return s.trim().slice(0, 2).toUpperCase() || null; }
-  function normZip(z = "") {
+  // export options
+  const [exporting, setExporting] = useState(false);
+  const [exComments, setExComments] = useState(false);
+  const [exLocation, setExLocation] = useState(false);
+
+  // profile location for stamping submissions
+  const [profileLoc, setProfileLoc] = useState(null);
+  const normState = (s = "") => s.trim().slice(0, 2).toUpperCase() || null;
+  const normZip = (z = "") => {
     const digits = String(z).replace(/\D/g, "");
     return digits ? digits.padStart(5, "0").slice(0, 5) : null;
-  }
+  };
 
-  // load once when the user is known
   useEffect(() => {
     (async () => {
       if (!user) { setProfileLoc(null); return; }
@@ -55,24 +66,11 @@ export default function PollViewPage() {
     })();
   }, [user]);
 
-  // Keep latest answers available to event handlers
+  // Keep latest answers available to handlers
   const answersRef = useRef(answers);
   useEffect(() => { answersRef.current = answers; }, [answers]);
 
-  // helpers for display
-  function formatDateStr(d /* 'YYYY-MM-DD' */) {
-    if (!d) return "";
-    const [y, m, day] = d.split("-").map(Number);
-    return new Date(y, m - 1, day).toLocaleDateString();
-  }
-
-  function formatWhen(ts) {
-    if (!ts) return "";
-    const d = ts?.toDate ? ts.toDate() : (ts instanceof Date ? ts : null);
-    return d ? d.toLocaleString() : "";
-  }
-
-  // Load poll + questions; hydrate existing user submissions
+  // Load poll + questions; hydrate existing user submissions and status
   useEffect(() => {
     (async () => {
       const snap = await getDoc(pollRef);
@@ -87,8 +85,9 @@ export default function PollViewPage() {
       // seed defaults
       const seed = {};
       items.forEach((q) => { seed[q.id] = { value: 0, showComment: false }; });
-      // hydrate from user's submissions if signed in
+
       if (user) {
+        // hydrate answers
         const qSub = query(
           collection(db, "submissions"),
           where("pollId", "==", pollId),
@@ -105,18 +104,46 @@ export default function PollViewPage() {
           };
         });
 
-        // load submission status (submittedAt) if present
+        // status (submittedAt + flag)
         const statusRef = doc(db, "submissions", `${pollId}__${user.uid}__status`);
         const statusSnap = await getDoc(statusRef);
+        setHasSubmitted(statusSnap.exists());
         if (statusSnap.exists()) {
           const s = statusSnap.data() || {};
           if (s.submittedAt) setSubmittedAt(s.submittedAt);
         }
+      } else {
+        setHasSubmitted(false);
       }
+
       setAnswers(seed);
       setLoading(false);
     })();
   }, [pollRef, questionsRef, user, pollId]);
+
+  async function handleExport(includeComments, includeLocation) {
+    try {
+      setExporting(true);
+      const { data } = await exportPollCsv({ pollId, includeComments, includeLocation });
+      if (data.kind === "inline") {
+        const blob = new Blob([data.csv], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = data.filename || `poll-${pollId}-export.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } else if (data.kind === "url") {
+        window.open(data.url, "_blank", "noopener");
+      }
+    } catch (e) {
+      setErr(e.message || "Export failed");
+    } finally {
+      setExporting(false);
+    }
+  }
 
   function submissionDocIdFor(qid) {
     return `${pollId}__${user.uid}__${qid}`;
@@ -132,12 +159,11 @@ export default function PollViewPage() {
     }
     setSavingIds((s) => ({ ...s, [qid]: true }));
     try {
-      // include only non-null location fields
       const loc = {};
       if (profileLoc?.city)  loc.city  = profileLoc.city;
       if (profileLoc?.state) loc.state = profileLoc.state;
       if (profileLoc?.zip)   loc.zip   = profileLoc.zip;
-      
+
       const payload = {
         pollId,
         userId: user.uid,
@@ -171,12 +197,8 @@ export default function PollViewPage() {
     Object.keys(a).forEach((qid) => persistAnswer(qid, a[qid]));
   }
 
-  // Save any in-memory changes if we leave this route
-  useEffect(() => {
-    return () => {
-      saveAllFromState();
-    };
-  }, []);
+  // Save in-memory changes on route exit
+  useEffect(() => () => { saveAllFromState(); }, []);
 
   // Comment helpers
   function addComment(qid) {
@@ -225,8 +247,7 @@ export default function PollViewPage() {
           submittedAt: serverTimestamp(),
         });
       }
-      // reflect immediately in UI
-      setSubmittedAt(new Date());
+      setSubmittedAt(new Date()); // reflect immediately
     } catch (e) {
       setErr(e.message || "Failed to submit");
     } finally {
@@ -241,15 +262,23 @@ export default function PollViewPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      {/* Title + Share (+ Edit if creator) */}
-      <div className="flex items-center justify-between">
+      {/* Title + Due + Submitted + Share/Edit */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">{poll.title || "Untitled Poll"}</h1>
-        <div className="rounded-xl border p-3 text-sm">
-          {poll?.dueDate
-            ? <>Due date: <span className="font-medium">{formatDateStr(poll.dueDate)}</span></>
-            : <span className="text-gray-600">No due date set</span>}
+
+        <div className="flex items-center gap-2">
+          <div className="rounded-xl border px-3 py-2 text-sm">
+            {poll?.dueDate
+              ? <>Due date: <span className="font-medium">{formatDateStr(poll.dueDate)}</span></>
+              : <span className="text-gray-600">No due date set</span>}
+          </div>
+          {submittedAt && (
+            <div className="rounded-xl border px-3 py-2 text-sm">
+              Submitted on: <span className="font-medium">{formatWhen(submittedAt)}</span>
+            </div>
+          )}
         </div>
-        
+
         <div className="flex items-center gap-2">
           <ShareButton pollId={pollId} />
           {isOwner && (
@@ -259,6 +288,34 @@ export default function PollViewPage() {
           )}
         </div>
       </div>
+
+      {/* Export (visible to signed-in users who submitted) */}
+      {user && hasSubmitted && (
+        <section className="rounded-2xl border p-4">
+          <h3 className="mb-2 font-medium">Export</h3>
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <span>CSV options:</span>
+            <label className="inline-flex items-center gap-2">
+              <input type="checkbox" checked={exComments} onChange={(e) => setExComments(e.target.checked)} />
+              Include comments
+            </label>
+            <label className="inline-flex items-center gap-2">
+              <input type="checkbox" checked={exLocation} onChange={(e) => setExLocation(e.target.checked)} />
+              Include city/state/ZIP
+            </label>
+            <button
+              className="rounded-xl border px-3 py-1 hover:bg-gray-50"
+              disabled={exporting}
+              onClick={() => handleExport(exComments, exLocation)}
+            >
+              {exporting ? "Preparing…" : "Export results (CSV)"}
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-gray-600">
+            User IDs are never included. Large exports may open as a temporary download link.
+          </p>
+        </section>
+      )}
 
       {/* Description */}
       {poll.description && (
