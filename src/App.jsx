@@ -10,8 +10,11 @@ import CreatePollPage from "./pages/CreatePoll";
 import PollViewPage from "./pages/PollView";
 import PollEditPage from "./pages/PollEdit";
 import FeedbackPage from "./pages/Feedback";
+import DonatePage from "./pages/Donate";
 import RequireAuth from "./routes/RequireAuth";
 import PollAdminPage from "./pages/PollAdmin";
+import VerifyEmailPage from "./pages/VerifyEmail";
+import AuthActionPage from "./pages/AuthAction";
 
 export default function App() {
   return (
@@ -33,6 +36,8 @@ export default function App() {
               <PollAdminPage />
             </RequireAuth>
           } />
+          <Route path="/verify" element={<VerifyEmailPage />} />
+          <Route path="/auth/action" element={<AuthActionPage />} />
         </Routes>
       </main>
       <Footer siteName="Dario Bianco" />

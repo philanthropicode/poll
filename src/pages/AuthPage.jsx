@@ -9,7 +9,7 @@ export default function AuthPage() {
   const [error, setError] = useState("");
   const [working, setWorking] = useState(false);
   const navigate = useNavigate();
-  const { signin, signup } = useAuth();
+  const { signin, signup, sendVerification } = useAuth();
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -18,6 +18,8 @@ export default function AuthPage() {
     try {
       if (isSignup) {
         await signup(email, password);
+        await sendVerification();      // <-- send verification email
+        navigate("/verify");           // <-- guide user to verification helper page
       } else {
         await signin(email, password);
       }
