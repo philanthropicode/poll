@@ -35,6 +35,22 @@ export default function PollEditPage() {
   const [editingId, setEditingId] = useState(null);
   const [editingText, setEditingText] = useState("");
 
+  // ✅ Memoize options so the editor isn't torn down every render
+  const mdeOptions = useMemo(
+    () => ({
+      spellChecker: false,
+      status: false,
+      autofocus: true,                 // keep focus in the editor
+      placeholder: "Write a short description…",
+      toolbar: [
+        "bold","italic","heading","|",
+        "quote","unordered-list","ordered-list","|",
+        "link","preview","guide"
+      ],
+    }),
+    []
+  );
+
   useEffect(() => {
     let unsubQ = () => {};
     (async () => {
@@ -136,11 +152,16 @@ export default function PollEditPage() {
         <h2 className="mb-2 text-lg font-medium">Description</h2>
         <form onSubmit={handleSaveDescription} className="space-y-3">
           <SimpleMDE
-            value={description}
-            onChange={setDescription}
-            options={{ spellChecker: false, status: false }}
+            id="poll-description"                 // stable id helps focusing
+            value={description ?? ""}             // ensure it's always a string
+            onChange={(v) => setDescription(v)}   // controlled value
+            options={mdeOptions}
           />
-          <button type="submit" className="rounded-xl border px-4 py-2 hover:bg-gray-50" disabled={saving}>
+          <button
+            type="submit"
+            className="rounded-xl border px-4 py-2 hover:bg-gray-50"
+            disabled={saving}
+          >
             {saving ? "Saving..." : "Save"}
           </button>
         </form>
