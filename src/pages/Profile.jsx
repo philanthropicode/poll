@@ -1,18 +1,21 @@
+// src/pages/Profile.jsx
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { db } from "../lib/firebase";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 
 function normalizeState(s = "") {
-  return s.trim().slice(0, 2).toUpperCase(); // e.g. "tx" -> "TX"
+  return s.trim().slice(0, 2).toUpperCase();
 }
 function normalizeZip(z = "") {
   const digits = String(z).replace(/\D/g, "");
-  return digits.padStart(5, "0").slice(0, 5); // keep 5-digit ZIP
+  return digits.padStart(5, "0").slice(0, 5);
 }
 
 export default function ProfilePage() {
-  const { user } = useAuth();
+  const { user, sendVerification, refreshUser } = useAuth();
+
+  // location profile fields
   const [city, setCity] = useState("");
   const [stateAbbr, setStateAbbr] = useState("");
   const [zip, setZip] = useState("");
@@ -20,6 +23,11 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
   const [saved, setSaved] = useState(false);
+
+  // verification UI
+  const [vBusy, setVBusy] = useState(false);
+  const [vMsg, setVMsg] = useState("");
+  const [vErr, setVErr] = useState("");
 
   useEffect(() => {
     let ignore = false;
@@ -61,6 +69,32 @@ export default function ProfilePage() {
     }
   }
 
+  async function handleResend() {
+    setVBusy(true); setVMsg(""); setVErr("");
+    try {
+      await sendVerification();
+      setVMsg("Verification email sent. Check your inbox (and spam).");
+    } catch (e) {
+      setVErr(e.message || "Failed to send verification email.");
+    } finally {
+      setVBusy(false);
+    }
+  }
+
+  async function handleRefresh() {
+    setVBusy(true); setVMsg(""); setVErr("");
+    try {
+      await refreshUser();
+      setVMsg(
+        (user?.emailVerified ? "Your email is verified." : "Still not verified. Click the link in your email, then press Refresh.")
+      );
+    } catch (e) {
+      setVErr(e.message || "Failed to refresh status.");
+    } finally {
+      setVBusy(false);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-xl space-y-4">
       <h2 className="text-xl font-semibold">Your Profile</h2>
@@ -72,9 +106,48 @@ export default function ProfilePage() {
           <p className="text-sm text-gray-600">Loading…</p>
         ) : (
           <>
-            <p className="text-sm mb-3">
-              Email: <span className="font-medium">{user.email}</span>
-            </p>
+            {/* Email + verification status */}
+            <div className="mb-3 space-y-1">
+              <p className="text-sm">
+                Email: <span className="font-medium">{user.email}</span>
+              </p>
+              <p className="text-sm">
+                Status:{" "}
+                <span className={user.emailVerified
+                  ? "text-green-700 font-medium"
+                  : "text-amber-700 font-medium"}>
+                  {user.emailVerified ? "Verified" : "Not verified"}
+                </span>
+              </p>
+
+              {!user.emailVerified && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    className="rounded-xl border px-3 py-2 hover:bg-gray-50"
+                    onClick={handleResend}
+                    disabled={vBusy}
+                  >
+                    Resend verification email
+                  </button>
+                  <button
+                    className="rounded-xl border px-3 py-2 hover:bg-gray-50"
+                    onClick={handleRefresh}
+                    disabled={vBusy}
+                  >
+                    Refresh status
+                  </button>
+                </div>
+              )}
+
+              {vMsg && (
+                <div className="mt-2 rounded-xl border border-blue-200 bg-blue-50 p-2 text-sm text-blue-800">{vMsg}</div>
+              )}
+              {vErr && (
+                <div className="mt-2 rounded-xl border border-red-200 bg-red-50 p-2 text-sm text-red-700">{vErr}</div>
+              )}
+            </div>
+
+            {/* Location form */}
             <form className="space-y-3" onSubmit={handleSave}>
               <div>
                 <label className="mb-1 block text-sm">City</label>
@@ -118,6 +191,7 @@ export default function ProfilePage() {
                 {saved && <span className="text-xs text-green-700">Saved</span>}
               </div>
             </form>
+
             <p className="text-xs text-gray-600 mt-3">UID: {user.uid}</p>
           </>
         )}
