@@ -1,3 +1,4 @@
+// src/context/AuthContext.jsx
 import React, { createContext, useContext, useEffect, useState, useRef } from "react";
 import {
   onAuthStateChanged,
@@ -5,6 +6,7 @@ import {
   createUserWithEmailAndPassword,
   signOut,
   getIdTokenResult,
+  sendEmailVerification,
 } from "firebase/auth";
 import { auth } from "../lib/firebase";
 
@@ -17,27 +19,41 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
-      // Read claims
-      let t = await getIdTokenResult(u);
-      // If we don't see admin yet, force one refresh once
-      if (!t.claims?.admin && !triedForceRefreshRef.current) {
-        triedForceRefreshRef.current = true;
-        try {
-          await u.getIdToken(true); // force refresh
-          t = await getIdTokenResult(u); // re-read claims
-        } catch {}
+      try {
+        if (!u) {
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+
+        // Get claims (admin, etc.)
+        let t = await getIdTokenResult(u);
+
+        // If admin claim not present yet, force a one-time refresh
+        if (!t.claims?.admin && !triedForceRefreshRef.current) {
+          triedForceRefreshRef.current = true;
+          try {
+            await u.getIdToken(true);
+            t = await getIdTokenResult(u);
+          } catch {
+            /* ignore */
+          }
+        }
+
+        setUser({ ...u, claims: t.claims });
+      } finally {
+        setLoading(false);
       }
-      setUser({ ...u, claims: t.claims });
-      setLoading(false);
     });
     return () => unsub();
   }, []);
 
-  const signin = (email, password) =>
-    signInWithEmailAndPassword(auth, email, password);
-  const signup = (email, password) =>
-    createUserWithEmailAndPassword(auth, email, password);
+  // Auth helpers
+  const signin = (email, password) => signInWithEmailAndPassword(auth, email, password);
+  const signup = (email, password) => createUserWithEmailAndPassword(auth, email, password);
   const signout = () => signOut(auth);
+
+  // Force ID token refresh to pull updated custom claims
   const refreshClaims = async () => {
     if (!auth.currentUser) return;
     await auth.currentUser.getIdToken(true);
@@ -45,7 +61,38 @@ export function AuthProvider({ children }) {
     setUser({ ...auth.currentUser, claims: t.claims });
   };
 
-  const value = { user, loading, signin, signup, signout, refreshClaims };
+  // Send the verification email
+  const sendVerification = async () => {
+    if (!auth.currentUser) throw new Error("Not signed in.");
+    const actionCodeSettings = {
+      // This route will handle the verification link
+      // After clicking the email link, Firebase verifies on its page and then redirects here:
+      url: `${window.location.origin}/verify`,
+      handleCodeInApp: false,
+    };
+    await sendEmailVerification(auth.currentUser, actionCodeSettings);
+  };
+
+  // Reload the Firebase user object so emailVerified updates after clicking the link
+  const refreshUser = async () => {
+    if (!auth.currentUser) return;
+    await auth.currentUser.reload();
+    // Pick up latest claims as well (optional)
+    const t = await getIdTokenResult(auth.currentUser);
+    setUser({ ...auth.currentUser, claims: t.claims });
+  };
+
+  const value = {
+    user,
+    loading,
+    signin,
+    signup,
+    signout,
+    refreshClaims,
+    sendVerification,
+    refreshUser,
+  };
+
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

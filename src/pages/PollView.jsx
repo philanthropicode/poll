@@ -328,11 +328,15 @@ export default function PollViewPage() {
       {/* Questions with sliders + comments */}
       <section className="rounded-2xl border p-4">
         <h2 className="mb-3 text-lg font-medium">Questions</h2>
-        {!user && (
+        {!user ? (
           <div className="mb-3 rounded-xl border p-3 text-sm">
             Please <Link to="/auth" className="underline">sign in</Link> to answer.
           </div>
-        )}
+        ) : !user.emailVerified ? (
+          <div className="mb-3 rounded-xl border p-3 text-sm">
+            Please <Link to="/verify" className="underline">verify your email</Link> to answer.
+          </div>
+        ) : null}
         <ul className="space-y-4">
           {questions.map((q) => {
             const a = answers[q.id] ?? { value: 0, showComment: false, comment: "" };
@@ -347,7 +351,7 @@ export default function PollViewPage() {
                     type="range"
                     min="-10" max="10" step="1"
                     value={a.value}
-                    disabled={!user}
+                    disabled={!user || !user.emailVerified}
                     onChange={(e) => handleSlider(q.id, e.target.value)}
                     onMouseUp={() => saveOneFromState(q.id)}
                     onTouchEnd={() => saveOneFromState(q.id)}
@@ -374,14 +378,14 @@ export default function PollViewPage() {
                         className="w-full rounded-xl border px-3 py-2 text-sm"
                         placeholder="Write a short comment…"
                         value={a.comment ?? ""}
-                        disabled={!user}
+                        disabled={!user || !user.emailVerified}
                         onChange={(e) => changeComment(q.id, e.target.value)}
                         onBlur={() => blurComment(q.id)}
                       />
                       <button
                         type="button"
                         className="text-sm text-red-600 hover:underline"
-                        disabled={!user}
+                        disabled={!user || !user.emailVerified}
                         onClick={() => removeComment(q.id)}
                       >
                         Remove comment
@@ -401,7 +405,7 @@ export default function PollViewPage() {
       {/* Submit whole poll */}
       <div className="flex justify-end">
         <button
-          disabled={!user || submitWorking || questions.length === 0}
+          disabled={!user || submitWorking || questions.length === 0 || !user.emailVerified}
           onClick={submitAll}
           className="rounded-xl border px-4 py-2 hover:bg-gray-50"
         >
