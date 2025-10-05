@@ -1,15 +1,41 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+// pages/AuthPage.jsx
+import React, { useEffect, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { auth } from "../lib/firebase";
 
 export default function AuthPage() {
-  const [isSignup, setIsSignup] = useState(false); // default to signin
+  const [isSignup, setIsSignup] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [working, setWorking] = useState(false);
+
   const navigate = useNavigate();
-  const { signin, signup, sendVerification } = useAuth();
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const redirect = params.get("redirect") || "/";
+
+  const { signin, signup, sendVerification, currentUser, authReady } = useAuth();
+
+  // Only decide what to do once we KNOW the auth state
+  useEffect(() => {
+    if (!authReady) return;
+    if (currentUser) {
+      navigate(redirect, { replace: true });
+    }
+  }, [authReady, currentUser, redirect, navigate]);
+
+  // last-resort fallback in case the listener never fires on a rare browser:
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (!authReady && auth.currentUser) {
+        // auth.currentUser is set even if the listener missed an event
+        navigate(redirect, { replace: true });
+      }
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [authReady, redirect, navigate]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -18,12 +44,14 @@ export default function AuthPage() {
     try {
       if (isSignup) {
         await signup(email, password);
-        await sendVerification();      // <-- send verification email
-        navigate("/verify");           // <-- guide user to verification helper page
+        await sendVerification();
+        navigate("/verify", { replace: true });
+        return;
       } else {
         await signin(email, password);
+        navigate(redirect, { replace: true }); // honor ?redirect=
+        return;
       }
-      navigate("/");
     } catch (err) {
       setError(err.message || "Something went wrong");
     } finally {
@@ -31,6 +59,12 @@ export default function AuthPage() {
     }
   }
 
+  // small loading gate so we don’t flash the form
+  if (!authReady) {
+    return <div className="mx-auto max-w-xl p-4 text-sm text-gray-600">Checking your session…</div>;
+  }
+
+  // If authReady && currentUser, the useEffect already navigated away.
   return (
     <div className="mx-auto max-w-xl space-y-4">
       <h2 className="text-xl font-semibold">{isSignup ? "Sign up" : "Sign in"}</h2>
@@ -64,14 +98,7 @@ export default function AuthPage() {
         <div className="flex items-center gap-10">
           {isSignup ? (
             <>
-              <a
-                href="#"
-                className="text-sm text-blue-600 hover:underline"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setIsSignup(false);
-                }}
-              >
+              <a href="#" className="text-sm text-blue-600 hover:underline" onClick={(e) => {e.preventDefault(); setIsSignup(false);}}>
                 Already have an account? Sign in
               </a>
               <button type="submit" disabled={working} className="rounded-xl border px-4 py-2 hover:bg-gray-50">
@@ -80,14 +107,7 @@ export default function AuthPage() {
             </>
           ) : (
             <>
-              <a
-                href="#"
-                className="text-sm text-blue-600 hover:underline"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setIsSignup(true);
-                }}
-              >
+              <a href="#" className="text-sm text-blue-600 hover:underline" onClick={(e) => {e.preventDefault(); setIsSignup(true);}}>
                 Need an account? Sign up
               </a>
               <button type="submit" disabled={working} className="rounded-xl border px-4 py-2 hover:bg-gray-50">
