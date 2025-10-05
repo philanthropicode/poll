@@ -40,6 +40,11 @@ export default function Header() {
                       </Link>
                     </li>
                     <li>
+                      <Link to="/pricing" className="block px-4 py-3 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>
+                        Pricing
+                      </Link>
+                    </li>
+                    <li>
                       <Link to="/donate" className="block px-4 py-3 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>
                         Donate
                       </Link>
