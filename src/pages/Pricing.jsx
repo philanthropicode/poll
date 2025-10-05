@@ -1,4 +1,6 @@
 import React from "react";
+import { Link } from "react-router-dom";
+import { buildAuthRedirect } from "../lib/urls";
 import PricingComparison from "../components/PricingComparison";
 
 export default function PricingPage() {
@@ -83,18 +85,22 @@ export default function PricingPage() {
             as a paid add-on.
           </div>
           <div className="flex gap-3">
-            <a
+            {/* <a
               href="/request-pilot"
               className="inline-block rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
             >
               Request Pilot
-            </a>
-            <a
+            </a> */}
+            <Link to={buildAuthRedirect("/request?subject=pilot")} className="inline-block rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">Request Pilot</Link>
+            {/* <a
               href="/contact"
               className="inline-block rounded-lg border px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
             >
               Talk to Us
-            </a>
+            </a> */}
+            {/* <Link to="/request?subject=general" className="btn-outline">Talk to Us</Link> */}
+            <Link to={buildAuthRedirect("/request?subject=general")} className="inline-block rounded-lg border px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50">Talk to Us</Link>
+            
           </div>
         </div>
 
@@ -124,12 +130,15 @@ export default function PricingPage() {
               (+$99/mo)
             </li>
           </ul>
-          <a
+          {/* <a
             href="/contact"
             className="inline-block rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
           >
             Contact Sales
-          </a>
+          </a> */}
+          {/* <Link to="/request?subject=sales" className="btn-primary">Contact Sales</Link> */}
+          
+          <Link to={buildAuthRedirect("/request?subject=sales")} className="inline-block rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">Contact Sales</Link>
         </div>
       </div>
 
@@ -172,15 +181,22 @@ export default function PricingPage() {
           >
             Get Started Free
           </a>
-          <a
+          {/* <a
             href="/request-pilot"
             className="inline-block rounded-lg border px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
           >
             Request an Org Pilot
-          </a>
+          </a> */}
+          {/* <Link to="/request?subject=pilot" className="btn-secondary">Request Org Pilot</Link> */}
+          
+          <Link to={buildAuthRedirect("/request?subject=pilot")} className="inline-block rounded-lg border px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50">Request Org Pilot</Link>
         </div>
       </div>
       <PricingComparison />
     </div>
   );
 }
+
+
+
+

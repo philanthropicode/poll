@@ -15,6 +15,7 @@ import PollAdminPage from "./pages/PollAdmin";
 import VerifyEmailPage from "./pages/VerifyEmail";
 import AuthActionPage from "./pages/AuthAction";
 import PricingPage from "./pages/Pricing";
+import RequestPage from "./pages/RequestPage";
 
 export default function App() {
   return (
@@ -38,6 +39,7 @@ export default function App() {
           <Route path="/verify" element={<VerifyEmailPage />} />
           <Route path="/auth/action" element={<AuthActionPage />} />
           <Route path="/pricing" element={<PricingPage />} />
+          <Route path="/request" element={<RequestPage />} />
         </Routes>
       </main>
       <Footer siteName="Dario Bianco" />

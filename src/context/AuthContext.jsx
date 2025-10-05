@@ -14,6 +14,7 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const triedForceRefreshRef = useRef(false);
 
@@ -22,6 +23,7 @@ export function AuthProvider({ children }) {
       try {
         if (!u) {
           setUser(null);
+          setAuthReady(true);
           setLoading(false);
           return;
         }
@@ -84,6 +86,7 @@ export function AuthProvider({ children }) {
 
   const value = {
     user,
+    authReady,
     loading,
     signin,
     signup,
