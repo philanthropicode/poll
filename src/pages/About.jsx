@@ -14,16 +14,16 @@ export default function AboutPage() {
       <section className="space-y-3">
         <h2 className="text-lg font-medium">Our Vision</h2>
         <p className="text-gray-700 text-sm">
-          We believe culture shouldn’t be dictated from the top down — it should be built
-          together. Philanthropicode exists to make collaboration measurable, transparent,
-          and democratic.
+          Division is visible everywhere, but agreement is where progress truly begins.
+          Philanthropicode helps governments, organizations, and communities cut through noise
+          and polarization by identifying the priorities people share in common.
         </p>
         <p className="text-gray-700 text-sm">
-          Our platform helps groups of any size identify what their members truly value,
-          transforming millions of individual voices into a collective compass — a guide for
-          where communities, teams, and nations want to go next. By grounding decisions in
-          shared values, Philanthropicode re-aligns how society allocates its attention,
-          energy, and resources — from local organizations to global systems.
+          We turn collective feedback into clarity — revealing where alignment already exists
+          and enabling leaders and members to act on it together. Our mission isn’t to erase
+          disagreement; it’s to make collaboration stronger than polarization. By transforming
+          common ground into coordinated action, we help people move from division to
+          direction — and make progress, even when they disagree.
         </p>
       </section>
 
