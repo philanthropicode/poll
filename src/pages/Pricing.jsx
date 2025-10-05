@@ -126,36 +126,7 @@ export default function PricingPage() {
               (+$99/mo)
             </li>
           </ul>
-          <a
-            href="/contact"
-            className="inline-block rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-          >
-            Contact Sales
-          </a>
         </div>
-      </div>
-
-      {/* Add-Ons */}
-      <div className="rounded-2xl border p-4 space-y-3">
-        <h2 className="text-lg font-medium">Add-Ons</h2>
-        <ul className="list-disc list-inside text-gray-700 text-sm space-y-1">
-          <li>
-            <strong>Privacy Add-On</strong> (Org &amp; Institutional): Bar platform from
-            gleaning aggregate insights on your org’s data — <strong>+$99/mo</strong>.
-          </li>
-          <li>
-            <strong>Extra Concurrent Polls</strong>: $10 per additional active poll beyond
-            plan limits.
-          </li>
-          <li>
-            <strong>Extended Insights</strong>: Tailored reporting &amp; visualizations —
-            <strong> $49/mo</strong>.
-          </li>
-          <li>
-            <strong>Facilitation &amp; Rollout</strong>: Hands-on setup, design, and analysis
-            support (contact us).
-          </li>
-        </ul>
       </div>
 
       {/* FAQ / Notes */}
@@ -205,6 +176,7 @@ export default function PricingPage() {
           </a>
         </div>
       </div>
+
       <PricingComparison />
     </div>
   );
