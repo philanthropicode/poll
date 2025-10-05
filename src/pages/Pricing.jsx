@@ -98,18 +98,16 @@ export default function PricingPage() {
           </div>
         </div>
 
-        {/* Institutional */}
+        {/* Institutional (no price, keep Contact Sales) */}
         <div className="rounded-2xl border p-4 space-y-3">
           <div className="flex items-baseline justify-between">
             <h2 className="text-lg font-medium">Institutional</h2>
-            <div className="text-right">
-              <div className="text-xl font-semibold">$249</div>
-              <div className="text-xs text-gray-500">per month</div>
-            </div>
+            {/* Intentionally no price shown */}
           </div>
           <p className="text-gray-700 text-sm">
             For municipalities, universities, and enterprises embedding collaborative
-            governance and compliance at scale.
+            governance and compliance at scale. Pricing depends on organization size, scope,
+            and support needs.
           </p>
           <ul className="list-disc list-inside text-gray-700 text-sm space-y-1">
             <li>Everything in Organization, plus:</li>
@@ -126,6 +124,12 @@ export default function PricingPage() {
               (+$99/mo)
             </li>
           </ul>
+          <a
+            href="/contact"
+            className="inline-block rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            Contact Sales
+          </a>
         </div>
       </div>
 
@@ -176,7 +180,6 @@ export default function PricingPage() {
           </a>
         </div>
       </div>
-
       <PricingComparison />
     </div>
   );
