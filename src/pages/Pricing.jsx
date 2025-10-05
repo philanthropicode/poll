@@ -1,4 +1,5 @@
 import React from "react";
+import PricingComparison from "../components/PricingComparison";
 
 export default function PricingPage() {
   return (
@@ -204,6 +205,7 @@ export default function PricingPage() {
           </a>
         </div>
       </div>
+      <PricingComparison />
     </div>
   );
 }
