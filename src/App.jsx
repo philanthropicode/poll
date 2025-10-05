@@ -10,7 +10,6 @@ import CreatePollPage from "./pages/CreatePoll";
 import PollViewPage from "./pages/PollView";
 import PollEditPage from "./pages/PollEdit";
 import FeedbackPage from "./pages/Feedback";
-import DonatePage from "./pages/Donate";
 import RequireAuth from "./routes/RequireAuth";
 import PollAdminPage from "./pages/PollAdmin";
 import VerifyEmailPage from "./pages/VerifyEmail";
@@ -31,7 +30,6 @@ export default function App() {
           <Route path="/polls/:id" element={<PollViewPage />} />
           <Route path="/polls/:id/edit" element={<PollEditPage />} />
           <Route path="/feedback" element={<FeedbackPage />} />
-          <Route path="/donate" element={<DonatePage />} />
           <Route path="/polls/:id/admin" element={
             <RequireAuth>
               <PollAdminPage />
