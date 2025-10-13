@@ -6,9 +6,16 @@ services:
     volumes:
       - .:/usr/src/app
       - /usr/src/app/node_modules
+      - /usr/src/app/functions/node_modules
     environment:
       - NODE_ENV=development
+      - CHOKIDAR_USEPOLLING=1
+      - WATCHPACK_POLLING=true
+      - WDS_SOCKET_PORT=5173
+      - VITE_DEV_HOST=0.0.0.0
       - FIREBASE_TOKEN=${FIREBASE_TOKEN}
+    working_dir: /usr/src/app
+    restart: always
     container_name: poll
     command: npm run dev
 
