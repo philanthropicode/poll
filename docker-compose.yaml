@@ -1,0 +1,21 @@
+services:
+  app:
+    build: .
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+    environment:
+      - NODE_ENV=development
+      - FIREBASE_TOKEN=${FIREBASE_TOKEN}
+    container_name: poll
+    command: npm run dev
+
+
+# NOTE: To deploy to Firebase from within the container, run:
+#   firebase deploy --token $FIREBASE_TOKEN
+# Make sure FIREBASE_TOKEN is set in your .env file or environment.
+# You can get a token by running `firebase login:ci` on your local machine
+# and copying the token it generates or run `firebase login --no-localhost` in
+# the container and copy the token it generates.
