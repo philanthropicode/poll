@@ -5,4 +5,12 @@ import tailwindcss from '@tailwindcss/vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  server: {
+    host: true,          // ⇦ listen on 0.0.0.0
+    port: 5173,
+    strictPort: true,
+    watch: { usePolling: true }, // ⇦ helps file watching in VM
+    hmr: { host: 'localhost', clientPort: 5173 }, // ⇦ stable HMR via forwarded port
+  },
 })
+
