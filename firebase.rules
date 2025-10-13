@@ -98,9 +98,20 @@ service cloud.firestore {
     
     // --- Profiles ---
     match /profiles/{uid} {
-      allow read: if isSignedIn() && request.auth.uid == uid; // or `if true` if you want public
-      allow create, update: if isSignedIn() && request.auth.uid == uid;
+      // Owner only
+      allow read: if isSignedIn() && request.auth.uid == uid;
+
+      allow create, update: if isSignedIn()
+                            && request.auth.uid == uid
+                            // Client must NOT set server-managed fields:
+                            && !(
+                                  ('geo' in request.resource.data)
+                                  || ('h3r8' in request.resource.data)
+                                  || ('lat' in request.resource.data)
+                                  || ('lng' in request.resource.data)
+                                );
     }
+
     
     // path helper
     function ratePath(uid) {
@@ -113,7 +124,7 @@ service cloud.firestore {
       allow create: if isSignedIn() && existsAfter(ratePath(request.auth.uid));
       // Reading feedback: keep as you prefer, it's your choice (admin-only, or owner-only, etc.)
       // Example admin-only:
-      allow read: if isAdmin(); // define isAdmin() if you need this
+      allow read: if isAdmin();
       allow update, delete: if false;
     }
 
@@ -136,6 +147,21 @@ service cloud.firestore {
                                );
 
       allow delete: if false;
+    }
+    
+    match /contactRequests/{docId} {
+      allow create: if request.resource.data.keys().hasAll([
+          'fullName','email','subject','createdAt','status','source','subjectKey'
+        ])
+        && request.resource.data.fullName is string
+        && request.resource.data.email is string
+        && request.resource.data.subject is string
+        && request.resource.data.status == 'new'
+        && request.resource.data.source == 'pricing'
+        && request.resource.data.subjectKey in ['sales','pilot','general']
+        && request.resource.data.createdAt == request.time;
+      allow read: if isAdmin();
+      allow update, delete: if false; // or your admin condition
     }
 
 	}
