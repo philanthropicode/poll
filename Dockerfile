@@ -12,8 +12,7 @@ RUN npm install
 # will not run unless they are installed separately here...
 RUN npm install firebase
 RUN npm install -g firebase-tools
-# NOTE
-#   Run `firebase login --no-localhost` in the container to authenticate.
+
 
 # Copy the rest of the source
 COPY . .
@@ -25,5 +24,15 @@ EXPOSE 3001 5173 3000 8080
 CMD ["bash", "-lc", "node -e \"setInterval(()=>{},1e9)\""]
 
 
-# NOTE: TO execute commands in the container, use:
-#   podman exec -it poll bash
+# NOTE
+#   Don’t run firebase login during build.
+#   Run `firebase login --no-localhost` in the container to authenticate
+#   Use firebase deploy --token "$FIREBASE_TOKEN" at runtime when you actually deploy.
+#
+#   To get a token locally: 
+#       `firebase login:ci` (copies a token you can put in .env and pass into compose).
+#       Inside the container, `firebase login --no-localhost` also works interactively.
+
+# NOTE
+#   To execute commands in the container, use:
+#     podman exec -it poll bash
