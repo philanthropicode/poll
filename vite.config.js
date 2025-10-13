@@ -6,11 +6,14 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
-    host: true,          // ⇦ listen on 0.0.0.0
+    host: '0.0.0.0',        // listen on all interfaces inside container
     port: 5173,
     strictPort: true,
-    watch: { usePolling: true }, // ⇦ helps file watching in VM
-    hmr: { host: 'localhost', clientPort: 5173 }, // ⇦ stable HMR via forwarded port
+    hmr: { clientPort: 5173 },
+    watch: {
+      usePolling: true,     // important on macOS volume mounts
+      interval: 300
+    }
   },
 })
 

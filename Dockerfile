@@ -2,7 +2,7 @@
 FROM node:22-bookworm
 
 # Create a consistent workspace
-WORKDIR /workspace
+WORKDIR /usr/src/app
 
 # Install global dependencies needed for development
 COPY package*.json ./
@@ -15,6 +15,7 @@ RUN npm install -g firebase-tools
 # NOTE
 #   Run `firebase login --no-localhost` in the container to authenticate.
 
+# Copy the rest of the source
 COPY . .
 
 # Expose likely dev ports
