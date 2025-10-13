@@ -1,8 +1,8 @@
-// src/pages/Profile.jsx
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { db } from "../lib/firebase";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
+import { getFunctions, httpsCallable } from "firebase/functions";
 
 function normalizeState(s = "") {
   return s.trim().slice(0, 2).toUpperCase();
@@ -15,7 +15,9 @@ function normalizeZip(z = "") {
 export default function ProfilePage() {
   const { user, sendVerification, refreshUser } = useAuth();
 
-  // location profile fields
+  // address/profile fields
+  const [line1, setLine1] = useState("");
+  const [line2, setLine2] = useState("");
   const [city, setCity] = useState("");
   const [stateAbbr, setStateAbbr] = useState("");
   const [zip, setZip] = useState("");
@@ -37,9 +39,12 @@ export default function ProfilePage() {
         const snap = await getDoc(doc(db, "profiles", user.uid));
         if (snap.exists() && !ignore) {
           const p = snap.data() || {};
-          setCity(p.city || "");
-          setStateAbbr(p.state || "");
-          setZip(p.zip || "");
+          const addr = p.address || p; // backward compat with your existing fields
+          setLine1(addr.line1 || "");
+          setLine2(addr.line2 || "");
+          setCity(addr.city || "");
+          setStateAbbr(addr.state || "");
+          setZip(addr.zip || "");
         }
       } finally {
         if (!ignore) setLoading(false);
@@ -53,16 +58,21 @@ export default function ProfilePage() {
     if (!user) return;
     setErr(""); setSaved(false); setSaving(true);
     try {
+      const functions = getFunctions();
+      const saveUserAddress = httpsCallable(functions, "saveUserAddress");
+
       const payload = {
+        line1: line1.trim(),
+        line2: line2.trim(),
         city: city.trim(),
         state: normalizeState(stateAbbr),
         zip: normalizeZip(zip),
-        updatedAt: serverTimestamp(),
       };
-      await setDoc(doc(db, "profiles", user.uid), payload, { merge: true });
-      setSaved(true);
+
+      const res = await saveUserAddress(payload);
+      if (res?.data?.ok) setSaved(true);
     } catch (e) {
-      setErr(e.message || "Failed to save profile");
+      setErr(e.message || "Failed to save address");
     } finally {
       setSaving(false);
       setTimeout(() => setSaved(false), 2000);
@@ -85,9 +95,9 @@ export default function ProfilePage() {
     setVBusy(true); setVMsg(""); setVErr("");
     try {
       await refreshUser();
-      setVMsg(
-        (user?.emailVerified ? "Your email is verified." : "Still not verified. Click the link in your email, then press Refresh.")
-      );
+      setVMsg(user?.emailVerified
+        ? "Your email is verified."
+        : "Still not verified. Click the link in your email, then press Refresh.");
     } catch (e) {
       setVErr(e.message || "Failed to refresh status.");
     } finally {
@@ -113,80 +123,55 @@ export default function ProfilePage() {
               </p>
               <p className="text-sm">
                 Status:{" "}
-                <span className={user.emailVerified
-                  ? "text-green-700 font-medium"
-                  : "text-amber-700 font-medium"}>
+                <span className={user.emailVerified ? "text-green-700 font-medium" : "text-amber-700 font-medium"}>
                   {user.emailVerified ? "Verified" : "Not verified"}
                 </span>
               </p>
 
               {!user.emailVerified && (
                 <div className="mt-2 flex flex-wrap gap-2">
-                  <button
-                    className="rounded-xl border px-3 py-2 hover:bg-gray-50"
-                    onClick={handleResend}
-                    disabled={vBusy}
-                  >
+                  <button className="rounded-xl border px-3 py-2 hover:bg-gray-50" onClick={handleResend} disabled={vBusy}>
                     Resend verification email
                   </button>
-                  <button
-                    className="rounded-xl border px-3 py-2 hover:bg-gray-50"
-                    onClick={handleRefresh}
-                    disabled={vBusy}
-                  >
+                  <button className="rounded-xl border px-3 py-2 hover:bg-gray-50" onClick={handleRefresh} disabled={vBusy}>
                     Refresh status
                   </button>
                 </div>
               )}
 
-              {vMsg && (
-                <div className="mt-2 rounded-xl border border-blue-200 bg-blue-50 p-2 text-sm text-blue-800">{vMsg}</div>
-              )}
-              {vErr && (
-                <div className="mt-2 rounded-xl border border-red-200 bg-red-50 p-2 text-sm text-red-700">{vErr}</div>
-              )}
+              {vMsg && <div className="mt-2 rounded-xl border border-blue-200 bg-blue-50 p-2 text-sm text-blue-800">{vMsg}</div>}
+              {vErr && <div className="mt-2 rounded-xl border border-red-200 bg-red-50 p-2 text-sm text-red-700">{vErr}</div>}
             </div>
 
-            {/* Location form */}
+            {/* Address form */}
             <form className="space-y-3" onSubmit={handleSave}>
               <div>
+                <label className="mb-1 block text-sm">Street address</label>
+                <input className="w-full rounded-xl border px-3 py-2" value={line1} onChange={(e) => setLine1(e.target.value)} placeholder="e.g., 1600 Pennsylvania Ave NW" />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm">Apt/Suite (optional)</label>
+                <input className="w-full rounded-xl border px-3 py-2" value={line2} onChange={(e) => setLine2(e.target.value)} placeholder="e.g., Apt 2B" />
+              </div>
+              <div>
                 <label className="mb-1 block text-sm">City</label>
-                <input
-                  className="w-full rounded-xl border px-3 py-2"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  placeholder="e.g., Austin"
-                />
+                <input className="w-full rounded-xl border px-3 py-2" value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g., Austin" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-sm">State (2-letter)</label>
-                  <input
-                    className="w-full rounded-xl border px-3 py-2"
-                    value={stateAbbr}
-                    onChange={(e) => setStateAbbr(e.target.value)}
-                    placeholder="e.g., TX"
-                    maxLength={2}
-                  />
+                  <input className="w-full rounded-xl border px-3 py-2" value={stateAbbr} onChange={(e) => setStateAbbr(e.target.value)} placeholder="e.g., TX" maxLength={2} />
                 </div>
                 <div>
                   <label className="mb-1 block text-sm">ZIP code</label>
-                  <input
-                    className="w-full rounded-xl border px-3 py-2"
-                    value={zip}
-                    inputMode="numeric"
-                    onChange={(e) => setZip(e.target.value)}
-                    placeholder="e.g., 73301"
-                  />
+                  <input className="w-full rounded-xl border px-3 py-2" value={zip} inputMode="numeric" onChange={(e) => setZip(e.target.value)} placeholder="e.g., 73301" />
                 </div>
               </div>
 
-              {err && (
-                <div className="rounded-xl border border-red-200 bg-red-50 p-2 text-sm text-red-700">{err}</div>
-              )}
+              {err && <div className="rounded-xl border border-red-200 bg-red-50 p-2 text-sm text-red-700">{err}</div>}
               <div className="flex items-center gap-3">
                 <button type="submit" disabled={saving} className="rounded-xl border px-4 py-2 hover:bg-gray-50">
-                  {saving ? "Saving…" : "Save"}
+                  {saving ? "Saving…" : "Save Address"}
                 </button>
                 {saved && <span className="text-xs text-green-700">Saved</span>}
               </div>

@@ -2,8 +2,10 @@ import { onCall } from "firebase-functions/v2/https";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
+import { defineSecret } from "firebase-functions/params";
+import { latLngToCell } from "h3-js";
 
-initializeApp(); // no args needed if default project
+initializeApp();
 
 export const exportPollCsv = onCall({ region: "us-central1", cors: true }, async (req) => {
   const uid = req.auth?.uid;
@@ -70,3 +72,65 @@ export const exportPollCsv = onCall({ region: "us-central1", cors: true }, async
     return { kind: "url", url };
   }
 });
+
+// === Address → h3r8 ===
+// 1) Define secret once (project-level). For prod/staging, set with:
+//    firebase functions:secrets:set MAPBOX_TOKEN
+const MAPBOX_TOKEN = defineSecret("MAPBOX_TOKEN");
+
+// 2) Helper: geocode via Mapbox
+async function geocodeWithMapbox(query) {
+  const token = process.env.MAPBOX_TOKEN;
+  if (!token) throw new Error("Missing MAPBOX_TOKEN");
+  const url = new URL(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json`);
+  url.searchParams.set("access_token", token);
+  url.searchParams.set("limit", "1");
+  url.searchParams.set("types", "address,poi,neighborhood,locality,place,postcode");
+  url.searchParams.set("country", "US");
+  const res = await fetch(url.toString());
+  if (!res.ok) throw new Error(`Mapbox error: ${res.status}`);
+  const data = await res.json();
+  const f = data?.features?.[0];
+  if (!f?.center || f.center.length < 2) throw new Error("No geocode result");
+  const [lng, lat] = f.center;
+  return { lat, lng, raw: f };
+}
+
+// 3) Callable
+export const saveUserAddress = onCall(
+  { region: "us-central1", cors: true, secrets: [MAPBOX_TOKEN] },
+  async (req) => {
+    const uid = req.auth?.uid;
+    if (!uid) throw new Error("unauthenticated");
+
+    const { line1 = "", line2 = "", city, state, zip } = (req.data || {});
+    if (!city || !state || !zip) throw new Error("invalid-argument: city, state, zip are required.");
+
+    const st = String(state).trim().slice(0, 2).toUpperCase();
+    const z5 = String(zip).replace(/\D/g, "").padStart(5, "0").slice(0, 5);
+
+    const addressStr = [line1, city, st, z5].filter(Boolean).join(", ");
+
+    const { lat, lng } = await geocodeWithMapbox(addressStr);
+    const h3r8 = latLngToCell(lat, lng, 8);
+
+    const db = getFirestore();
+    await db.doc(`profiles/${uid}`).set({
+      address: {
+        line1: String(line1 || "").trim(),
+        line2: String(line2 || "").trim(),
+        city: String(city || "").trim(),
+        state: st,
+        zip: z5,
+      },
+      geo: {
+        lat, lng, h3r8,
+        source: "mapbox",
+        updatedAt: new Date(),
+      },
+      updatedAt: new Date(),
+    }, { merge: true });
+
+    return { ok: true, h3r8, lat, lng };
+  }
+);
