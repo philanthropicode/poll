@@ -17,7 +17,8 @@ import { db } from "../lib/firebase";
 import { useAuth } from "../context/AuthContext";
 import ShareButton from "../components/ShareButton";
 import PollDescription from "../components/PollDescription";
-import { exportPollCsv } from "../lib/callables";
+import PollH3Heatmap, { exampleFetchAggs as fetchAggs } from "../components/PollH3Heatmap";
+import { exportPollCsv, finalizeSubmission as finalizeSubmissionFn, rollupNow as rollupNowFn } from "../lib/callables";
 
 // ---- helpers ---------------------------------------------------------------
 function formatDateStr(d) {
@@ -64,36 +65,34 @@ export default function PollViewPage() {
   const [exComments, setExComments] = useState(false);
   const [exLocation, setExLocation] = useState(false);
 
-  // profile location for stamping submissions
-  const [profileLoc, setProfileLoc] = useState(null);
-  const normState = (s = "") => s.trim().slice(0, 2).toUpperCase() || null;
-  const normZip = (z = "") => {
-    const digits = String(z).replace(/\D/g, "");
-    return digits ? digits.padStart(5, "0").slice(0, 5) : null;
-  };
+  const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN || "";
 
-  // Load profile location (for stamping submissions)
-  useEffect(() => {
-    (async () => {
-      if (!user) {
-        setProfileLoc(null);
-        return;
-      }
-      const snap = await getDoc(doc(db, "profiles", user.uid));
-      const p = snap.data() || {};
-      setProfileLoc({
-        city: (p.city || "").trim() || null,
-        state: normState(p.state || ""),
-        zip: normZip(p.zip || ""),
-      });
-    })();
-  }, [user]);
+  // admin + heatmap refresh
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [rebuildBusy, setRebuildBusy] = useState(false);
+  const [heatmapVersion, setHeatmapVersion] = useState(0);
+
 
   // Keep latest answers available to handlers
   const answersRef = useRef(answers);
   useEffect(() => {
     answersRef.current = answers;
   }, [answers]);
+
+  // Detect admin claim for rollup button
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!user) { if (!cancelled) setIsAdmin(false); return; }
+        const res = await user.getIdTokenResult(true);
+        if (!cancelled) setIsAdmin(!!res?.claims?.admin);
+      } catch {
+        if (!cancelled) setIsAdmin(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
 
   // Load poll + questions; hydrate existing user submissions and status
   useEffect(() => {
@@ -194,18 +193,13 @@ export default function PollViewPage() {
     }
     setSavingIds((s) => ({ ...s, [qid]: true }));
     try {
-      const loc = {};
-      if (profileLoc?.city) loc.city = profileLoc.city;
-      if (profileLoc?.state) loc.state = profileLoc.state;
-      if (profileLoc?.zip) loc.zip = profileLoc.zip;
-
       const payload = {
         pollId,
         userId: user.uid,
         questionId: qid,
         value: next.value,
+        submitted: false,
         updatedAt: serverTimestamp(),
-        ...loc,
       };
       payload.comment =
         next.comment && next.comment.trim().length > 0
@@ -285,6 +279,7 @@ export default function PollViewPage() {
       await Promise.all(
         qids.map((qid) => persistAnswer(qid, answersRef.current[qid]))
       );
+      await finalizeSubmissionFn({ pollId });
 
       const statusRef = doc(db, "submissions", statusDocId());
       const existing = await getDocOnce(statusRef);
@@ -436,6 +431,50 @@ export default function PollViewPage() {
           <PollDescription description={poll.description} />
         </section>
       )}
+
+      {/* Heatmap */}
+      <section className="rounded-2xl border p-4 overflow-hidden">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-lg font-medium">Community heatmap</h2>
+          {isAdmin && (
+            <button
+              className="rounded-xl border px-3 py-1 text-sm hover:bg-gray-50 disabled:opacity-60"
+              disabled={rebuildBusy}
+              onClick={async () => {
+                try {
+                  setRebuildBusy(true);
+                  await rollupNowFn({ pollId });
+                  // Force heatmap to remount/refetch
+                  setHeatmapVersion((v) => v + 1);
+                } catch (e) {
+                  console.error(e);
+                  setErr(e?.message || "Failed to rebuild heatmap");
+                } finally {
+                  setRebuildBusy(false);
+                }
+              }}
+              title="Recompute aggregates for this poll now"
+            >
+              {rebuildBusy ? "Rebuilding…" : "Rebuild heatmap (admin)"}
+            </button>
+          )}
+        </div>
+
+        
+          <PollH3Heatmap
+            key={heatmapVersion}
+            pollId={pollId}
+            mapboxToken={mapboxToken}
+            questions={questions.map(q => ({ id: q.id, label: q.text || "" }))}
+            defaultQuestionId={questions[0]?.id}
+            resolution={8}
+            fetchAggs={fetchAggs}
+          />
+        
+        <p className="mt-2 text-xs text-gray-600">
+          Map updates after scheduled rollups (every 3 hours). Admins can force a rebuild.
+        </p>
+      </section>
 
       {/* Questions with sliders + comments */}
       <section className="rounded-2xl border p-4">

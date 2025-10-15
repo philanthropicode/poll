@@ -44,6 +44,7 @@ export function AuthProvider({ children }) {
 
         setUser({ ...u, claims: t.claims });
       } finally {
+        setAuthReady(true);
         setLoading(false);
       }
     });
@@ -86,6 +87,8 @@ export function AuthProvider({ children }) {
 
   const value = {
     user,
+    currentUser: user,
+    isAdmin: !!(user && user.claims && user.claims.admin === true),
     authReady,
     loading,
     signin,

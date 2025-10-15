@@ -2,7 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- Helpers ---
+    // ================= Helpers =================
     function isSignedIn() {
       return request.auth != null;
     }
@@ -13,7 +13,7 @@ service cloud.firestore {
       return isSignedIn() && pollDoc(pollId).data.createdBy == request.auth.uid;
     }
     function isAdmin() {
-    	return isSignedIn() && request.auth.token.admin == true;
+      return isSignedIn() && request.auth.token.admin == true;
     }
     // A poll is open if it has no dueAt OR now < dueAt
     function pollOpen(pollId) {
@@ -22,133 +22,128 @@ service cloud.firestore {
     }
     function isPollAdmin(pollId) {
       let p = pollDoc(pollId);
-      // Treat owner or global admin as poll admin
       let ownerOrGlobal = isAdmin() || (isSignedIn() && p.data.createdBy == request.auth.uid);
-      // If you store admins as an ARRAY of UIDs: ["uid1","uid2",...]
       let arrayListed = ('admins' in p.data) && p.data.admins.hasAny([request.auth.uid]);
-      // If you store admins as a MAP of { uid: true }
       let mapListed = ('adminsMap' in p.data) && (request.auth.uid in p.data.adminsMap);
       return ownerOrGlobal || arrayListed || mapListed;
     }
 
-
-    // --- Polls ---
+    // ================= Polls ==================
     match /polls/{pollId} {
       allow read: if true;
       allow create: if isSignedIn();
 
-      // Owner can update, but cannot change dueDate/dueAt once created.
-      // (No pollOpen check here so the owner may still edit title/description after the due date if you want.)
+      // Owner can update (cannot change dueDate/dueAt once set)
       allow update: if isOwner(pollId)
                     && (!('dueDate' in request.resource.data) || request.resource.data.dueDate == resource.data.dueDate)
                     && (!('dueAt'   in request.resource.data) || request.resource.data.dueAt   == resource.data.dueAt);
 
+      // Questions subcollection
       match /questions/{questionId} {
         allow read: if true;
-
-        // Questions may only be written while the poll is open (and by the owner).
         allow create, update, delete: if isOwner(pollId) && pollOpen(pollId);
+      }
+
+      // Read-only H3 aggregates per resolution (explicit segments; wildcards can't be partial)
+      match /h3Agg_r7/{h3} {
+        allow read: if true;
+        allow write: if false;
+      }
+      match /h3Agg_r8/{h3} {
+        allow read: if true;
+        allow write: if false;
+      }
+      match /h3Agg_r9/{h3} {
+        allow read: if true;
+        allow write: if false;
       }
     }
 
-    // --- Submissions (per-user answers & status) ---
-    // function noClientLocationFields() {
-    //   return !('city' in request.resource.data)
-    //       && !('state' in request.resource.data)
-    //       && !('zip' in request.resource.data);
-    // }
-    
-//     match /submissions/{docId} {
-//       allow read: if true;
-
-//       // Create: must belong to the signer, must specify pollId, and the poll must be open.
-//       allow create: if isSignedIn()
-//                     && request.resource.data.userId == request.auth.uid
-//                     && ('pollId' in request.resource.data)
-//                     && pollOpen(request.resource.data.pollId);
-//                     // && noClientLocationFields();
-
-//       // Update: signer must own the doc, may not change ownership/identity fields,
-//       // and the poll must still be open.
-//       allow update: if isSignedIn()
-//                     && resource.data.userId == request.auth.uid
-//                     // don't allow changing these keys
-//                     && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
-//                     && (!('pollId' in request.resource.data) || request.resource.data.pollId == resource.data.pollId)
-//                     && (!('questionId' in request.resource.data) || request.resource.data.questionId == resource.data.questionId)
-//                     && pollOpen(resource.data.pollId);
-//                     // && noClientLocationFields();
-//     }
-    match /submissions/{docId} {
+    // ================= Submissions ==================
+    // Rules cover both per-question docs and the special status doc.
+    // - Per-question docs must have id == pollId__uid__questionId
+    // - Status doc id typically == pollId__uid__status (no questionId field)
+    // Clients may NOT stamp location fields; server stamps them during finalization.
+    match /submissions/{id} {
       allow read: if isSignedIn() &&
                   (resource.data.userId == request.auth.uid || isPollAdmin(resource.data.pollId));
 
+      // Create rules
       allow create: if isSignedIn()
-                    && request.resource.data.userId == request.auth.uid
-                    && ('pollId' in request.resource.data)
-                    && ( !('dueAt' in pollDoc(request.resource.data.pollId).data) || request.time < pollDoc(request.resource.data.pollId).data.dueAt );
+        && request.resource.data.userId == request.auth.uid
+        && ('pollId' in request.resource.data)
+        && pollOpen(request.resource.data.pollId)
+        // block client-side location stamping (server-only)
+        && !('location' in request.resource.data)
+        && !('lat' in request.resource.data)
+        && !('lng' in request.resource.data)
+        && !('h3' in request.resource.data)
+        // id constraints:
+        && (
+             // per-question submission requires questionId and strict id
+             (('questionId' in request.resource.data)
+               && id == (request.resource.data.pollId + '__' + request.auth.uid + '__' + request.resource.data.questionId))
+             ||
+             // status doc: no questionId; id must match pollId__uid__status
+             ((!('questionId' in request.resource.data))
+               && id.matches('^' + request.resource.data.pollId + '__' + request.auth.uid + '__status$'))
+           );
 
+      // Update rules
       allow update: if isSignedIn()
-                    && resource.data.userId == request.auth.uid
-                    && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
-                    && (!('pollId' in request.resource.data) || request.resource.data.pollId == resource.data.pollId)
-                    && (!('questionId' in request.resource.data) || request.resource.data.questionId == resource.data.questionId)
-                    && ( !('dueAt' in pollDoc(resource.data.pollId).data) || request.time < pollDoc(resource.data.pollId).data.dueAt );
+        && resource.data.userId == request.auth.uid
+        // do not allow changing ownership/identity fields
+        && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
+        && (!('pollId' in request.resource.data) || request.resource.data.pollId == resource.data.pollId)
+        && (!('questionId' in request.resource.data) || request.resource.data.questionId == resource.data.questionId)
+        && pollOpen(resource.data.pollId)
+        // block client-side location stamping (server-only)
+        && !('location' in request.resource.data)
+        && !('lat' in request.resource.data)
+        && !('lng' in request.resource.data)
+        && !('h3' in request.resource.data);
+
+      allow delete: if false;
     }
-    
-    // --- Profiles ---
+
+    // ================= Profiles ==================
     match /profiles/{uid} {
       // Owner only
       allow read: if isSignedIn() && request.auth.uid == uid;
 
+      // Clients cannot set server-managed geo fields
       allow create, update: if isSignedIn()
-                            && request.auth.uid == uid
-                            // Client must NOT set server-managed fields:
-                            && !(
-                                  ('geo' in request.resource.data)
-                                  || ('h3r8' in request.resource.data)
-                                  || ('lat' in request.resource.data)
-                                  || ('lng' in request.resource.data)
-                                );
+        && request.auth.uid == uid
+        && !('geo' in request.resource.data)
+        && !('lat' in request.resource.data)
+        && !('lng' in request.resource.data)
+        && !('h3' in request.resource.data);
     }
 
-    
-    // path helper
+    // ================= Feedback (unchanged) ==================
     function ratePath(uid) {
       return /databases/$(database)/documents/feedback_ratelimits/$(uid);
     }
 
     match /feedback/{id} {
-      // Must be signed in AND the batch must also write the rate doc
-      // Create only if signed-in AND rate-limit conditions are satisfied.
       allow create: if isSignedIn() && existsAfter(ratePath(request.auth.uid));
-      // Reading feedback: keep as you prefer, it's your choice (admin-only, or owner-only, etc.)
-      // Example admin-only:
       allow read: if isAdmin();
       allow update, delete: if false;
     }
 
-		// Per-user rate metadata for feedback (not publicly readable)
     match /feedback_ratelimits/{uid} {
-      // private
       allow read: if false;
-
-      // Signed-in user can update/create their own rate doc,
-      // *but* only if cooldown is satisfied.
       allow create, update: if isSignedIn()
-                            && request.auth.uid == uid
-                            && (
-                                 // first message ever
-                                 !exists(ratePath(uid))
-                                 // or previous doc lacked lastAt (legacy/cleanup)
-                                 || !('lastAt' in get(ratePath(uid)).data)
-                                 // otherwise enforce 30s gap
-                                 || request.time > get(ratePath(uid)).data.lastAt + duration.value(30, 's')
-                               );
-
+        && request.auth.uid == uid
+        && (
+             !exists(ratePath(uid))
+             || !('lastAt' in get(ratePath(uid)).data)
+             || request.time > get(ratePath(uid)).data.lastAt + duration.value(30, 's')
+           );
       allow delete: if false;
     }
-    
+
+    // ================= Contact Requests (unchanged) ==================
     match /contactRequests/{docId} {
       allow create: if request.resource.data.keys().hasAll([
           'fullName','email','subject','createdAt','status','source','subjectKey'
@@ -161,8 +156,7 @@ service cloud.firestore {
         && request.resource.data.subjectKey in ['sales','pilot','general']
         && request.resource.data.createdAt == request.time;
       allow read: if isAdmin();
-      allow update, delete: if false; // or your admin condition
+      allow update, delete: if false;
     }
-
-	}
+  }
 }
