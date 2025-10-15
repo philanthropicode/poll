@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { db } from "../lib/firebase";
+import { db, functions } from "../lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
-import { getFunctions, httpsCallable } from "firebase/functions";
+import { httpsCallable } from "firebase/functions";
 
 function normalizeState(s = "") {
   return s.trim().slice(0, 2).toUpperCase();
@@ -58,7 +58,6 @@ export default function ProfilePage() {
     if (!user) return;
     setErr(""); setSaved(false); setSaving(true);
     try {
-      const functions = getFunctions();
       const saveUserAddress = httpsCallable(functions, "saveUserAddress");
 
       const payload = {

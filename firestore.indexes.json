@@ -1,0 +1,48 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "submissions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "pollId", "order": "ASCENDING" },
+        { "fieldPath": "submitted", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "submissions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "pollId", "order": "ASCENDING" },
+        { "fieldPath": "questionId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "submissions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "pollId", "order": "ASCENDING" },
+        { "fieldPath": "userId", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "h3Agg_r7",
+      "fieldPath": "stats",
+      "indexes": [],
+      "shouldIndex": false
+    },
+    {
+      "collectionGroup": "h3Agg_r8",
+      "fieldPath": "stats",
+      "indexes": [],
+      "shouldIndex": false
+    },
+    {
+      "collectionGroup": "h3Agg_r9",
+      "fieldPath": "stats",
+      "indexes": [],
+      "shouldIndex": false
+    }
+  ]
+}
