@@ -13,9 +13,22 @@ export const exportPollCsv = onCall({ region: "us-central1", cors: true }, async
   if (!pollId) throw new Error("invalid-argument: pollId required");
 
   const db = getFirestore();
+
+  // --- determine permissions (owner/global admin/listed admin) --------------
+  const pollSnap = await db.doc(`polls/${pollId}`).get();
+  if (!pollSnap.exists) throw new Error("not-found: poll not found");
+  const poll = pollSnap.data() || {};
+  const isOwner = poll.createdBy === uid;
+  const isGlobalAdmin = req.auth?.token?.admin === true;
+  const arrayListed = Array.isArray(poll.admins) && poll.admins.includes(uid);
+  const mapListed = poll.adminsMap && typeof poll.adminsMap === "object" && !!poll.adminsMap[uid];
+  const isPollAdmin = isOwner || isGlobalAdmin || arrayListed || mapListed;
+
   const statusId = `${pollId}__${uid}__status`;
   const statusSnap = await db.doc(`submissions/${statusId}`).get();
-  if (!statusSnap.exists) throw new Error("permission-denied: submit the poll first");
+  if (!statusSnap.exists && !isPollAdmin) {
+    throw new Error("permission-denied: export requires submitter or poll admin");
+  }
 
   const qsSnap = await db.collection(`polls/${pollId}/questions`).get();
   const questions = [];
