@@ -59,6 +59,11 @@ export default function PollViewPage() {
   const [submittedAt, setSubmittedAt] = useState(null); // Timestamp | Date | null
   const [hasSubmitted, setHasSubmitted] = useState(false);
 
+  // admin visibility for export
+  const [isAdmin, setIsAdmin] = useState(false);         // global admin via custom claim
+  const [isPollAdmin, setIsPollAdmin] = useState(false); // owner/global or listed on poll
+
+
   // export options
   const [exporting, setExporting] = useState(false);
   const [exComments, setExComments] = useState(false);
@@ -77,8 +82,18 @@ export default function PollViewPage() {
     (async () => {
       if (!user) {
         setProfileLoc(null);
+        setIsAdmin(false);
         return;
       }
+
+      // get custom claims for global admin
+      try {
+        const tokenResult = await user.getIdTokenResult(true);
+        setIsAdmin(!!tokenResult.claims?.admin);
+      } catch (_) {
+        setIsAdmin(false);
+      }
+
       const snap = await getDoc(doc(db, "profiles", user.uid));
       const p = snap.data() || {};
       setProfileLoc({
@@ -99,7 +114,19 @@ export default function PollViewPage() {
   useEffect(() => {
     (async () => {
       const snap = await getDoc(pollRef);
-      if (snap.exists()) setPoll({ id: snap.id, ...snap.data() });
+      if (snap.exists()) {
+        const pollData = { id: snap.id, ...snap.data() };
+        setPoll(pollData);
+        // compute poll-admin (owner, global admin, or listed in admins/adminsMap)
+        if (user) {
+          const owner = user.uid === pollData.createdBy;
+          const arrayListed = Array.isArray(pollData.admins) && pollData.admins.includes(user.uid);
+          const mapListed = pollData.adminsMap && typeof pollData.adminsMap === "object" && !!pollData.adminsMap[user.uid];
+          setIsPollAdmin(owner || arrayListed || mapListed);
+        } else {
+          setIsPollAdmin(false);
+        }
+      };
 
       const qsSnap = await getDocs(questionsRef);
       const items = [];
@@ -341,6 +368,7 @@ export default function PollViewPage() {
     return <div className="p-6 text-sm text-gray-600">Poll not found.</div>;
 
   const isOwner = user?.uid === poll.createdBy;
+  const canSeeExport = !!user && (hasSubmitted || isOwner || isAdmin || isPollAdmin);
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -392,8 +420,8 @@ export default function PollViewPage() {
         </div>
       </div>
 
-      {/* Export (visible to signed-in users who submitted) */}
-      {user && hasSubmitted && (
+      {/* Export (visible to submitters OR poll admins/owner/global admin) */}
+      {canSeeExport && (
         <section className="rounded-2xl border p-4">
           <h3 className="mb-2 font-medium">Export</h3>
           <div className="flex flex-wrap items-center gap-3 text-sm">
