@@ -153,10 +153,36 @@ async function rollupPoll(pollId) {
     }
     if (!h3id) continue;
 
-    // Normalize to r9 then compute parents
-    const r9 = h3res === 9 ? h3id : cellToParent(h3id, 9);
-    const r8 = cellToParent(r9, 8);
-    const r7 = cellToParent(r9, 7);
+    // Normalize to appropriate resolutions
+    let r9, r8, r7;
+    try {
+      if (h3res === 9) {
+        r9 = h3id;
+        r8 = cellToParent(r9, 8);
+        r7 = cellToParent(r9, 7);
+      } else if (h3res === 8) {
+        // Use r8 value for all resolutions (privacy-preserving)
+        r9 = h3id;  // Use r8 value
+        r8 = h3id;
+        r7 = cellToParent(r8, 7);
+      } else if (h3res === 7) {
+        // Use r7 value for all resolutions
+        r9 = h3id;  // Use r7 value
+        r8 = h3id;  // Use r7 value
+        r7 = h3id;
+      } else if (h3res < 7) {
+        // Skip very low resolution data
+        continue;
+      } else {
+        // Higher than r9, convert down
+        r9 = cellToParent(h3id, 9);
+        r8 = cellToParent(r9, 8);
+        r7 = cellToParent(r9, 7);
+      }
+    } catch (e) {
+      console.warn(`Skipping invalid H3 cell ${h3id} at resolution ${h3res}:`, e.message);
+      continue;
+    }
 
     const v = Number.isFinite(s.value) ? Number(s.value) : 0;
     const qid = String(s.questionId);
@@ -249,17 +275,34 @@ export const scheduledRollup = onSchedule(
 
 // ================ ADMIN CALLABLE =======================
 export const rollupNow = onCall({ region: "us-central1" }, async (req) => {
-  if (!isAdminReq(req)) throw new HttpsError("permission-denied", "Admin only");
-  const pollId = String(req.data?.pollId || "");
-  if (!pollId) throw new HttpsError("invalid-argument", "pollId required");
-  return await rollupPoll(pollId);
+  try {
+    console.log("rollupNow called with:", req.data);
+    console.log("Auth UID:", req.auth?.uid);
+    console.log("ALLOW_ADMINS:", process.env.ALLOW_ADMINS);
+    
+    if (!isAdminReq(req)) {
+      console.log("Admin check failed");
+      throw new HttpsError("permission-denied", "Admin only");
+    }
+    
+    const pollId = String(req.data?.pollId || "");
+    if (!pollId) throw new HttpsError("invalid-argument", "pollId required");
+    
+    console.log("Starting rollup for pollId:", pollId);
+    const result = await rollupPoll(pollId);
+    console.log("Rollup completed:", result);
+    return result;
+  } catch (error) {
+    console.error("rollupNow error:", error);
+    throw error;
+  }
 });
 
  
 // ================ READ API (Callable) ======================
 // Callable equivalent of getH3Agg (dev-friendly; no CORS/proxy)
 export const getH3AggCallable = onCall(
-  { region: "us-central1", timeoutSeconds: 60, memory: "256MiB" },
+  { region: "us-central1", timeoutSeconds: 30, memory: "512MiB" },
   async (req) => {
     try {
       const d = req.data || {};
@@ -289,6 +332,18 @@ export const getH3AggCallable = onCall(
       const aggs = [];
 
       if (haveBounds) {
+        // Strict bounds validation to prevent memory issues
+        const area = Math.abs((east - west) * (north - south));
+        const maxArea = reso >= 8 ? 25 : reso >= 7 ? 100 : 400; // Smaller areas for higher resolution
+        if (area > maxArea) {
+          throw new HttpsError("invalid-argument", `bounds area ${area.toFixed(2)} too large for resolution ${reso}`);
+        }
+
+        // Additional validation: prevent very small bounds that could cause issues
+        if (area < 0.00001) {
+          throw new HttpsError("invalid-argument", "bounds area too small");
+        }
+
         // rectangle ring (lng,lat) closed
         const rect = [
           [west, south],
@@ -302,9 +357,16 @@ export const getH3AggCallable = onCall(
         try {
           // h3-js v4: polygonToCells expects an array of loops
           cells = polygonToCells([rect], reso, false);
+          console.log(`Generated ${cells.length} cells for bounds area ${area.toFixed(4)}`);
+          
+          // Strict cell count limits based on resolution
+          const maxCells = reso >= 8 ? 1000 : reso >= 7 ? 2000 : 5000;
+          if (cells.length > maxCells) {
+            throw new Error(`Too many cells: ${cells.length} > ${maxCells} for resolution ${reso}`);
+          }
         } catch (err) {
-          console.error("polygonToCells failed", { err, reso, west, south, east, north });
-          throw new HttpsError("invalid-argument", "bounds polygon failed");
+          console.error("polygonToCells failed", { err, reso, west, south, east, north, area });
+          throw new HttpsError("invalid-argument", `bounds polygon failed: ${err.message}`);
         }
 
         // Batch IN queries (Firestore supports up to 30 ids per IN)
@@ -318,12 +380,13 @@ export const getH3AggCallable = onCall(
           });
         }
       } else {
-        // No bounds provided: return all (OK for demos; avoid at scale)
-        const snap = await col.get();
+        // No bounds provided: return very limited results to prevent memory issues
+        const snap = await col.limit(100).get();
         snap.forEach((d) => {
           const s = (d.data() || {}).stats?.[questionId];
           if (s && typeof s.sum === "number") aggs.push({ h3: d.id, sum: s.sum });
         });
+        console.log(`No bounds provided, returned ${aggs.length} cells`);
       }
 
       return { aggs };

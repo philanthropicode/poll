@@ -60,14 +60,48 @@ service cloud.firestore {
     }
 
     // ================= Submissions ==================
+    // Rules cover both per-question docs and the special status doc.
+    // - Per-question docs must have id == pollId__uid__questionId
+    // - Status doc id typically == pollId__uid__status (no questionId field)
+    // Clients may NOT stamp location fields; server stamps them during finalization.
     match /submissions/{id} {
       allow read: if isSignedIn() &&
                   (resource.data.userId == request.auth.uid || isPollAdmin(resource.data.pollId));
 
-      // Simplified rules for debugging
-      allow create, update: if isSignedIn()
+      // Create rules
+      allow create: if isSignedIn()
         && request.resource.data.userId == request.auth.uid
-        && ('pollId' in request.resource.data);
+        && ('pollId' in request.resource.data)
+        && pollOpen(request.resource.data.pollId)
+        // block client-side location stamping (server-only)
+        && !('location' in request.resource.data)
+        && !('lat' in request.resource.data)
+        && !('lng' in request.resource.data)
+        && !('h3' in request.resource.data)
+        // id constraints:
+        && (
+             // per-question submission requires questionId and strict id
+             (('questionId' in request.resource.data)
+               && id == (request.resource.data.pollId + '__' + request.auth.uid + '__' + request.resource.data.questionId))
+             ||
+             // status doc: no questionId; id must match pollId__uid__status
+             ((!('questionId' in request.resource.data))
+               && id.matches('^' + request.resource.data.pollId + '__' + request.auth.uid + '__status$'))
+           );
+
+      // Update rules
+      allow update: if isSignedIn()
+        && resource.data.userId == request.auth.uid
+        // do not allow changing ownership/identity fields
+        && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
+        && (!('pollId' in request.resource.data) || request.resource.data.pollId == resource.data.pollId)
+        && (!('questionId' in request.resource.data) || request.resource.data.questionId == resource.data.questionId)
+        && pollOpen(resource.data.pollId)
+        // block client-side location stamping (server-only)
+        && !('location' in request.resource.data)
+        && !('lat' in request.resource.data)
+        && !('lng' in request.resource.data)
+        && !('h3' in request.resource.data);
 
       allow delete: if false;
     }

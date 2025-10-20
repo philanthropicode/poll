@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { useAuth } from "../context/AuthContext";
+import { getH3AggCallable } from "../lib/callables";
 
 export default function PollAdminPage() {
   const { id: pollId } = useParams();
@@ -29,8 +30,212 @@ export default function PollAdminPage() {
   const [totals, setTotals] = useState({}); // qid -> sum
   const [open, setOpen] = useState({}); // userId -> bool
   const [err, setErr] = useState("");
+  const [debugOutput, setDebugOutput] = useState("");
+  const [debugBusy, setDebugBusy] = useState(false);
 
   const isGlobalAdmin = !!user?.claims?.admin;
+
+  // Debug functions
+  async function testH3Agg() {
+    if (!questions[0]) return;
+    setDebugBusy(true);
+    try {
+      const { data } = await getH3AggCallable({
+        pollId,
+        questionId: questions[0].id,
+        res: 8
+      });
+      setDebugOutput(JSON.stringify(data, null, 2));
+    } catch (e) {
+      setDebugOutput(`Error: ${e.message}`);
+    } finally {
+      setDebugBusy(false);
+    }
+  }
+
+  async function testH3AggWithBounds() {
+    if (!questions[0]) return;
+    setDebugBusy(true);
+    try {
+      const { data } = await getH3AggCallable({
+        pollId,
+        questionId: questions[0].id,
+        res: 6, // Lower resolution to avoid cell limit
+        west: -77.5,
+        south: 38.5,
+        east: -76.5,
+        north: 39.5
+      });
+      setDebugOutput(JSON.stringify(data, null, 2));
+    } catch (e) {
+      setDebugOutput(`Error: ${e.message}`);
+    } finally {
+      setDebugBusy(false);
+    }
+  }
+
+  async function checkRawSubmissions() {
+    setDebugBusy(true);
+    try {
+      const subQ = query(
+        collection(db, "submissions"),
+        where("pollId", "==", pollId)
+      );
+      const subSnap = await getDocs(subQ);
+      const subs = [];
+      subSnap.forEach((d) => {
+        const data = d.data();
+        if (data.questionId) { // Only question submissions, not status
+          subs.push({
+            id: d.id,
+            questionId: data.questionId,
+            value: data.value,
+            city: data.city,
+            state: data.state,
+            zip: data.zip,
+            userId: data.userId
+          });
+        }
+      });
+      setDebugOutput(JSON.stringify(subs, null, 2));
+    } catch (e) {
+      setDebugOutput(`Error: ${e.message}`);
+    } finally {
+      setDebugBusy(false);
+    }
+  }
+
+  async function checkSubmittedOnly() {
+    setDebugBusy(true);
+    try {
+      const subQ = query(
+        collection(db, "submissions"),
+        where("pollId", "==", pollId),
+        where("submitted", "==", true)
+      );
+      const subSnap = await getDocs(subQ);
+      const subs = [];
+      subSnap.forEach((d) => {
+        const data = d.data();
+        if (data.questionId) { // Only question submissions, not status
+          subs.push({
+            id: d.id,
+            questionId: data.questionId,
+            value: data.value,
+            submitted: data.submitted,
+            location: data.location,
+            userId: data.userId
+          });
+        }
+      });
+      setDebugOutput(JSON.stringify(subs, null, 2));
+    } catch (e) {
+      setDebugOutput(`Error: ${e.message}`);
+    } finally {
+      setDebugBusy(false);
+    }
+  }
+
+  async function checkUserProfile() {
+    setDebugBusy(true);
+    try {
+      // Check profiles for users who submitted to this poll
+      const subQ = query(
+        collection(db, "submissions"),
+        where("pollId", "==", pollId),
+        where("submitted", "==", true)
+      );
+      const subSnap = await getDocs(subQ);
+      const userIds = new Set();
+      subSnap.forEach(d => {
+        const data = d.data();
+        if (data.questionId && data.userId) {
+          userIds.add(data.userId);
+        }
+      });
+      
+      const profiles = {};
+      for (const uid of userIds) {
+        try {
+          const profSnap = await getDoc(doc(db, "profiles", uid));
+          if (profSnap.exists()) {
+            profiles[uid] = profSnap.data();
+          }
+        } catch (e) {}
+      }
+      
+      setDebugOutput(JSON.stringify(profiles, null, 2));
+    } catch (e) {
+      setDebugOutput(`Error: ${e.message}`);
+    } finally {
+      setDebugBusy(false);
+    }
+  }
+
+  async function checkRollupData() {
+    setDebugBusy(true);
+    try {
+      const results = {};
+      
+      // Check the actual rollup storage locations
+      for (const res of [7, 8, 9]) {
+        const colPath = `polls/${pollId}/h3Agg_r${res}`;
+        try {
+          const snap = await getDocs(collection(db, "polls", pollId, `h3Agg_r${res}`));
+          const docs = [];
+          snap.forEach(d => docs.push({ id: d.id, ...d.data() }));
+          if (docs.length > 0) {
+            results[colPath] = docs;
+          }
+        } catch (e) {
+          // Collection might not exist, skip
+        }
+      }
+      
+      // Also check poll meta for dirty flag
+      try {
+        const pollSnap = await getDoc(doc(db, "polls", pollId));
+        if (pollSnap.exists()) {
+          const meta = pollSnap.data()?.meta;
+          if (meta) {
+            results[`polls/${pollId}/meta`] = meta;
+          }
+        }
+      } catch (e) {}
+      
+      setDebugOutput(JSON.stringify(results, null, 2));
+    } catch (e) {
+      setDebugOutput(`Error: ${e.message}`);
+    } finally {
+      setDebugBusy(false);
+    }
+  }
+
+  async function checkH3AggForAllQuestions() {
+    setDebugBusy(true);
+    try {
+      const results = {};
+      
+      for (const q of questions) {
+        try {
+          const { data } = await getH3AggCallable({
+            pollId,
+            questionId: q.id,
+            res: 8
+          });
+          results[q.text || q.id] = data;
+        } catch (e) {
+          results[q.text || q.id] = `Error: ${e.message}`;
+        }
+      }
+      
+      setDebugOutput(JSON.stringify(results, null, 2));
+    } catch (e) {
+      setDebugOutput(`Error: ${e.message}`);
+    } finally {
+      setDebugBusy(false);
+    }
+  }
 
   useEffect(() => {
     if (authLoading) return; // wait until auth is known
@@ -157,6 +362,67 @@ export default function PollAdminPage() {
           </Link>
         </div>
       </div>
+
+      {/* Debug Panel */}
+      <section className="mb-4 rounded-2xl border p-4 bg-gray-50">
+        <h3 className="mb-2 font-medium">Debug Functions</h3>
+        <div className="flex flex-wrap gap-2 mb-3">
+          <button
+            className="rounded-xl border px-3 py-1 text-sm hover:bg-white disabled:opacity-60"
+            disabled={debugBusy || !questions[0]}
+            onClick={testH3Agg}
+          >
+            Test H3 Agg (no bounds)
+          </button>
+          <button
+            className="rounded-xl border px-3 py-1 text-sm hover:bg-white disabled:opacity-60"
+            disabled={debugBusy || !questions[0]}
+            onClick={testH3AggWithBounds}
+          >
+            Test H3 Agg (MD bounds, res 6)
+          </button>
+          <button
+            className="rounded-xl border px-3 py-1 text-sm hover:bg-white disabled:opacity-60"
+            disabled={debugBusy}
+            onClick={checkRawSubmissions}
+          >
+            Check Raw Submissions
+          </button>
+          <button
+            className="rounded-xl border px-3 py-1 text-sm hover:bg-white disabled:opacity-60"
+            disabled={debugBusy}
+            onClick={checkRollupData}
+          >
+            Check Rollup Data
+          </button>
+          <button
+            className="rounded-xl border px-3 py-1 text-sm hover:bg-white disabled:opacity-60"
+            disabled={debugBusy}
+            onClick={checkUserProfile}
+          >
+            Check User Profiles
+          </button>
+          <button
+            className="rounded-xl border px-3 py-1 text-sm hover:bg-white disabled:opacity-60"
+            disabled={debugBusy}
+            onClick={checkSubmittedOnly}
+          >
+            Check Submitted=True
+          </button>
+          <button
+            className="rounded-xl border px-3 py-1 text-sm hover:bg-white disabled:opacity-60"
+            disabled={debugBusy || !questions.length}
+            onClick={checkH3AggForAllQuestions}
+          >
+            Test All Questions
+          </button>
+        </div>
+        {debugOutput && (
+          <pre className="text-xs bg-white p-2 rounded border overflow-auto max-h-40">
+            {debugOutput}
+          </pre>
+        )}
+      </section>
 
       {/* Table */}
       <div className="overflow-x-auto rounded-2xl border">

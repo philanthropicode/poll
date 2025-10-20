@@ -1,4 +1,3 @@
-// src/pages/PollView.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import {
@@ -17,8 +16,8 @@ import { db } from "../lib/firebase";
 import { useAuth } from "../context/AuthContext";
 import ShareButton from "../components/ShareButton";
 import PollDescription from "../components/PollDescription";
-import PollH3Heatmap, { exampleFetchAggs as fetchAggs } from "../components/PollH3Heatmap";
-import { exportPollCsv, finalizeSubmission as finalizeSubmissionFn, rollupNow as rollupNowFn } from "../lib/callables";
+import PollH3Heatmap from "../components/PollH3Heatmap";
+import { exportPollCsv, finalizeSubmission as finalizeSubmissionFn, rollupNow as rollupNowFn, getH3AggCallable } from "../lib/callables";
 
 // ---- helpers ---------------------------------------------------------------
 function formatDateStr(d) {
@@ -36,6 +35,38 @@ function ymd(date) {
   const m = String(date.getUTCMonth() + 1).padStart(2, "0");
   const d = String(date.getUTCDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
+}
+
+// Fetch H3 aggregates (no bounds: return all; supports bounds if you enable windowing later)
+async function fetchAggs({ pollId, questionId, bounds, resolution }) {
+  const finite =
+    bounds &&
+    [bounds.west, bounds.south, bounds.east, bounds.north].every(Number.isFinite) &&
+    bounds.west < bounds.east &&
+    bounds.south < bounds.north;
+
+  const payload = finite
+    ? {
+        pollId,
+        questionId,
+        res: resolution,
+        west: bounds.west,
+        south: bounds.south,
+        east: bounds.east,
+        north: bounds.north,
+      }
+    : { pollId, questionId, res: resolution };
+
+  const { data } = await getH3AggCallable(payload);
+  return (data && data.aggs) ? data.aggs : [];
+}
+
+// Helper functions for profile location
+function normState(s) {
+  return String(s || "").trim().slice(0, 2).toUpperCase() || null;
+}
+function normZip(z) {
+  return String(z || "").replace(/\D/g, "").padStart(5, "0").slice(0, 5) || null;
 }
 // ---------------------------------------------------------------------------
 
@@ -64,7 +95,6 @@ export default function PollViewPage() {
   const [isAdmin, setIsAdmin] = useState(false);         // global admin via custom claim
   const [isPollAdmin, setIsPollAdmin] = useState(false); // owner/global or listed on poll
 
-
   // export options
   const [exporting, setExporting] = useState(false);
   const [exComments, setExComments] = useState(false);
@@ -73,9 +103,9 @@ export default function PollViewPage() {
   const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN || "";
 
   // admin + heatmap refresh
-  // const [isAdmin, setIsAdmin] = useState(false);
   const [rebuildBusy, setRebuildBusy] = useState(false);
   const [heatmapVersion, setHeatmapVersion] = useState(0);
+  const [profileLoc, setProfileLoc] = useState(null);
 
   // Load profile location (for stamping submissions)
   useEffect(() => {
@@ -480,19 +510,23 @@ export default function PollViewPage() {
       <section className="rounded-2xl border p-4 overflow-hidden">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-lg font-medium">Community heatmap</h2>
-          {isAdmin && (
+          {isPollAdmin && (
             <button
               className="rounded-xl border px-3 py-1 text-sm hover:bg-gray-50 disabled:opacity-60"
               disabled={rebuildBusy}
               onClick={async () => {
                 try {
                   setRebuildBusy(true);
-                  await rollupNowFn({ pollId });
+                  console.log('Calling rollupNow with pollId:', pollId);
+                  console.log('User auth state:', user?.uid, user?.emailVerified);
+                  const result = await rollupNowFn({ pollId });
+                  console.log('Rollup result:', result);
                   // Force heatmap to remount/refetch
                   setHeatmapVersion((v) => v + 1);
+                  setErr('Rollup completed successfully!');
                 } catch (e) {
-                  console.error(e);
-                  setErr(e?.message || "Failed to rebuild heatmap");
+                  console.error('Rollup error:', e);
+                  setErr(`Rollup failed: ${e?.message || e}. Try signing out and back in.`);
                 } finally {
                   setRebuildBusy(false);
                 }
