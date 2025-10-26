@@ -1,3 +1,4 @@
+// src/pages/PollView.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import {
@@ -411,6 +412,21 @@ export default function PollViewPage() {
   const isOwner = user?.uid === poll.createdBy;
   const canSeeExport = !!user && (hasSubmitted || isOwner || isAdmin || isPollAdmin);
 
+  // Only show map if the signed-in user submitted before the poll deadline
+  const toJSDate = (t) => (t?.toDate ? t.toDate() : t instanceof Date ? t : null);
+  const pollDueAt =
+    (poll?.dueAt && toJSDate(poll.dueAt)) ||
+    (poll?.dueDate
+      ? (() => {
+          const [y, m, d] = String(poll.dueDate).split("-").map(Number);
+          // End-of-day local time for YYYY-MM-DD due date
+          return new Date(y, (m || 1) - 1, d || 1, 23, 59, 59, 999);
+        })()
+      : null);
+  const submittedDate = toJSDate(submittedAt);
+  const canSeeMap =
+    !!user && hasSubmitted && (!pollDueAt || (submittedDate && submittedDate <= pollDueAt));
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       {/* Title + Due + Submitted + Share/Edit/Copy */}
@@ -539,19 +555,29 @@ export default function PollViewPage() {
         </div>
 
         
-          <PollH3Heatmap
-            key={heatmapVersion}
-            pollId={pollId}
-            mapboxToken={mapboxToken}
-            questions={questions.map(q => ({ id: q.id, label: q.text || "" }))}
-            defaultQuestionId={questions[0]?.id}
-            resolution={8}
-            fetchAggs={fetchAggs}
-          />
-        
-        <p className="mt-2 text-xs text-gray-600">
-          Map updates after scheduled rollups (every 3 hours). Admins can force a rebuild.
-        </p>
+        {canSeeMap ? (
+          <>
+            <PollH3Heatmap
+              key={heatmapVersion}
+              pollId={pollId}
+              mapboxToken={mapboxToken}
+              questions={questions.map(q => ({ id: q.id, label: q.text || "" }))}
+              defaultQuestionId={questions[0]?.id}
+              resolution={8}
+              fetchAggs={fetchAggs}
+            />
+            <p className="mt-2 text-xs text-gray-600">
+              Map updates after scheduled rollups (every 3 hours). Admins can force a rebuild.
+            </p>
+          </>
+        ) : (
+          <div className="rounded-xl border bg-gray-50 p-4 text-sm text-gray-700">
+            <p className="mb-2 font-medium">Heatmap locked</p>
+            <p>
+              Cast your vote and submit before the poll deadline to unlock the community heatmap.
+            </p>
+          </div>
+        )}
       </section>
 
       {/* Questions with sliders + comments */}

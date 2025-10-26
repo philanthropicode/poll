@@ -1,3 +1,4 @@
+// functions/index.js
 import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { onSchedule } from "firebase-functions/v2/scheduler";
@@ -306,6 +307,10 @@ export const getH3AggCallable = onCall(
   async (req) => {
     try {
       const d = req.data || {};
+      const uid = req.auth?.uid;
+      if (!uid) {
+        throw new HttpsError("unauthenticated", "Sign in required");
+      }
       const pollId = String(d.pollId || "");
       const questionId = String(d.questionId || "");
       const reso = Number(d.res ?? 8);
@@ -321,6 +326,28 @@ export const getH3AggCallable = onCall(
       }
       if (!Number.isInteger(reso) || reso < 0 || reso > 15) {
         throw new HttpsError("invalid-argument", "res must be an integer between 0 and 15");
+      }
+
+      // ---- permission check (submitter OR poll admin/owner/global) ----
+      const pollSnap = await db.doc(`polls/${pollId}`).get();
+      if (!pollSnap.exists) throw new HttpsError("not-found", "poll not found");
+      const poll = pollSnap.data() || {};
+      const isOwner = poll.createdBy === uid;
+      const isGlobalAdmin = req.auth?.token?.admin === true;
+      const arrayListed = Array.isArray(poll.admins) && poll.admins.includes(uid);
+      const mapListed =
+        poll.adminsMap && typeof poll.adminsMap === "object" && !!poll.adminsMap[uid];
+      const isPollAdmin = isOwner || isGlobalAdmin || arrayListed || mapListed;
+
+      const statusId = `${pollId}__${uid}__status`;
+      const statusSnap = await db.doc(`submissions/${statusId}`).get();
+      const isSubmitter = statusSnap.exists;
+
+      if (!isSubmitter && !isPollAdmin) {
+        throw new HttpsError(
+          "permission-denied",
+          "Viewing aggregates requires submitting a response or being a poll admin"
+        );
       }
 
       const haveBounds = [west, south, east, north].every(Number.isFinite);

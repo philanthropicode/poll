@@ -27,6 +27,12 @@ service cloud.firestore {
       let mapListed = ('adminsMap' in p.data) && (request.auth.uid in p.data.adminsMap);
       return ownerOrGlobal || arrayListed || mapListed;
     }
+    // A user has “submitted” for this poll if their status doc exists
+    function hasSubmitted(pollId, uid) {
+      let sid = pollId + "__" + uid + "__status";   // build the doc id first
+      return isSignedIn() &&
+             exists(/databases/$(database)/documents/submissions/$(sid));
+    }
 
     // ================= Polls ==================
     match /polls/{pollId} {
@@ -46,15 +52,15 @@ service cloud.firestore {
 
       // Read-only H3 aggregates per resolution (explicit segments; wildcards can't be partial)
       match /h3Agg_r7/{h3} {
-        allow read: if true;
+        allow read: if isSignedIn() && (isPollAdmin(pollId) || hasSubmitted(pollId, request.auth.uid));
         allow write: if false;
       }
       match /h3Agg_r8/{h3} {
-        allow read: if true;
+        allow read: if isSignedIn() && (isPollAdmin(pollId) || hasSubmitted(pollId, request.auth.uid));
         allow write: if false;
       }
       match /h3Agg_r9/{h3} {
-        allow read: if true;
+        allow read: if isSignedIn() && (isPollAdmin(pollId) || hasSubmitted(pollId, request.auth.uid));
         allow write: if false;
       }
     }
