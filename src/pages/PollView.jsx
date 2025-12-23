@@ -1,5 +1,5 @@
 // src/pages/PollView.jsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   doc,
@@ -14,10 +14,11 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 import ShareButton from "../components/ShareButton";
 import PollDescription from "../components/PollDescription";
-import PollH3Heatmap, { exampleFetchAggs as fetchAggs } from "../components/PollH3Heatmap";
+import PollH3Heatmap from "../components/PollH3Heatmap";
+import { exampleFetchAggs as fetchAggs } from "../lib/exampleFetchAggs";
 import { exportPollCsv, finalizeSubmission as finalizeSubmissionFn, rollupNow as rollupNowFn } from "../lib/callables";
 
 // ---- helpers ---------------------------------------------------------------
@@ -179,42 +180,39 @@ export default function PollViewPage() {
     }
   }
 
-  function submissionDocIdFor(qid) {
-    return `${pollId}__${user.uid}__${qid}`;
-  }
-  function statusDocId() {
-    return `${pollId}__${user.uid}__status`;
-  }
+  const persistAnswer = useCallback(
+    async (qid, next) => {
+      if (!user) {
+        setErr("Please sign in to submit responses.");
+        return;
+      }
+      setSavingIds((s) => ({ ...s, [qid]: true }));
+      try {
+        const payload = {
+          pollId,
+          userId: user.uid,
+          questionId: qid,
+          value: next.value,
+          submitted: false,
+          updatedAt: serverTimestamp(),
+        };
+        payload.comment =
+          next.comment && next.comment.trim().length > 0
+            ? next.comment.trim()
+            : null;
 
-  async function persistAnswer(qid, next) {
-    if (!user) {
-      setErr("Please sign in to submit responses.");
-      return;
-    }
-    setSavingIds((s) => ({ ...s, [qid]: true }));
-    try {
-      const payload = {
-        pollId,
-        userId: user.uid,
-        questionId: qid,
-        value: next.value,
-        submitted: false,
-        updatedAt: serverTimestamp(),
-      };
-      payload.comment =
-        next.comment && next.comment.trim().length > 0
-          ? next.comment.trim()
-          : null;
-
-      await setDoc(doc(db, "submissions", submissionDocIdFor(qid)), payload, {
-        merge: true,
-      });
-    } catch (e) {
-      setErr(e.message || "Failed to save response");
-    } finally {
-      setSavingIds((s) => ({ ...s, [qid]: false }));
-    }
-  }
+        const submissionId = `${pollId}__${user.uid}__${qid}`;
+        await setDoc(doc(db, "submissions", submissionId), payload, {
+          merge: true,
+        });
+      } catch (e) {
+        setErr(e.message || "Failed to save response");
+      } finally {
+        setSavingIds((s) => ({ ...s, [qid]: false }));
+      }
+    },
+    [pollId, user]
+  );
 
   // Slider: update UI only; save on release & on exit/submit
   function handleSlider(qid, value) {
@@ -225,17 +223,17 @@ export default function PollViewPage() {
     const latest = answersRef.current[qid];
     if (latest) persistAnswer(qid, latest);
   }
-  function saveAllFromState() {
+  const saveAllFromState = useCallback(() => {
     const a = answersRef.current || {};
     Object.keys(a).forEach((qid) => persistAnswer(qid, a[qid]));
-  }
+  }, [persistAnswer]);
 
   // Save in-memory changes on route exit
   useEffect(
     () => () => {
       saveAllFromState();
     },
-    []
+    [saveAllFromState]
   );
 
   // Comment helpers
@@ -281,7 +279,8 @@ export default function PollViewPage() {
       );
       await finalizeSubmissionFn({ pollId });
 
-      const statusRef = doc(db, "submissions", statusDocId());
+      const statusDocId = `${pollId}__${user.uid}__status`;
+      const statusRef = doc(db, "submissions", statusDocId);
       const existing = await getDocOnce(statusRef);
       if (existing.exists()) {
         await updateDoc(statusRef, { submittedAt: serverTimestamp() });

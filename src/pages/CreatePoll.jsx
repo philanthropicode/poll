@@ -6,7 +6,7 @@ import {
   writeBatch, doc, getDocs
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 
 function formatDate(d) {
   if (!d) return "";

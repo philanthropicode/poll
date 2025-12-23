@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 import { db } from "../lib/firebase";
 import {
   collection, doc, serverTimestamp, writeBatch, increment

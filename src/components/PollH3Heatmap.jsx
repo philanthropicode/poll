@@ -2,8 +2,27 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
+const PALETTE = ["#2c7bb6", "#abd9e9", "#ffffbf", "#fdae61", "#d7191c"];
+
+function buildColorExpression(min, max) {
+  return [
+    "interpolate",
+    ["linear"],
+    ["get", "value"],
+    min,
+    PALETTE[0],
+    min + (max - min) * 0.25,
+    PALETTE[1],
+    min + (max - min) * 0.5,
+    PALETTE[2],
+    min + (max - min) * 0.75,
+    PALETTE[3],
+    max,
+    PALETTE[4],
+  ];
+}
+
 import { cellToBoundary } from "h3-js";
-import { getH3AggCallable } from "../lib/callables";
 
 // Simple object types (JSDoc for editor hints)
 /**
@@ -78,19 +97,6 @@ export default function PollH3Heatmap({
     for (const a of list) { if (a.sum < min) min = a.sum; if (a.sum > max) max = a.sum; }
     if (min === max) { min = Math.floor(min - 1); max = Math.ceil(max + 1); }
     return { min, max };
-  }
-
-  const PALETTE = ["#2c7bb6","#abd9e9","#ffffbf","#fdae61","#d7191c"];
-
-  function buildColorExpression(min, max) {
-    return [
-      "interpolate", ["linear"], ["get", "value"],
-      min, PALETTE[0],
-      min + (max - min) * 0.25, PALETTE[1],
-      min + (max - min) * 0.5,  PALETTE[2],
-      min + (max - min) * 0.75, PALETTE[3],
-      max, PALETTE[4],
-    ];
   }
 
   const domain = useMemo(() => computeDomain(aggs), [aggs]);
@@ -227,7 +233,6 @@ export default function PollH3Heatmap({
 }
 
 function Legend({ min, max }) {
-  const PALETTE = ["#2c7bb6","#abd9e9","#ffffbf","#fdae61","#d7191c"];
   return (
     <div className="grid grid-cols-12 gap-2 items-center">
       <span className="text-xs text-gray-600 justify-self-end col-span-1">{min}</span>
@@ -242,41 +247,5 @@ function Legend({ min, max }) {
   );
 }
 
-// Example fetchAggs implementation (HTTP)
-// GET /api/polls/:pollId/h3Agg?questionId=...&west=...&south=...&east=...&north=...&res=8
-// export async function exampleFetchAggs({ pollId, questionId, bounds, resolution }) {
-//   const { data } = await getH3AggCallable({
-//     pollId,
-//     questionId,
-//     res: resolution,
-//     west: bounds.west,
-//     south: bounds.south,
-//     east: bounds.east,
-//     north: bounds.north,
-//   });
-//   return (data && data.aggs) ? data.aggs : [];
-// }
-export async function exampleFetchAggs({ pollId, questionId, bounds, resolution }) {
-  // Only pass bounds if every edge is a finite number and the rectangle is valid.
-  const finite =
-    bounds &&
-    [bounds.west, bounds.south, bounds.east, bounds.north].every(Number.isFinite) &&
-    bounds.west < bounds.east &&
-    bounds.south < bounds.north;
-
-  const payload = finite
-    ? {
-        pollId,
-        questionId,
-        res: resolution,
-        west: bounds.west,
-        south: bounds.south,
-        east: bounds.east,
-        north: bounds.north,
-      }
-    : { pollId, questionId, res: resolution }; // no bounds → safe “return all” path
-
-  const { data } = await getH3AggCallable(payload);
-  return (data && data.aggs) ? data.aggs : [];
-}
+// Example fetchAggs implementation lives in src/lib/exampleFetchAggs.js to preserve fast refresh.
 

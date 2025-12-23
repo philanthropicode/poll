@@ -41,7 +41,7 @@ export default function PollDescription({ description = "" }) {
         remarkPlugins={[remarkGfm, remarkBreaks]}
         rehypePlugins={[[rehypeSanitize, schema]]}
         components={{
-          a: ({ node, ...props }) => (
+          a: (props) => (
             <a
               {...props}
               target="_blank"
@@ -50,17 +50,15 @@ export default function PollDescription({ description = "" }) {
             />
           ),
           // Paragraph spacing
-          p: ({ node, ...props }) => (
-            <p {...props} className="!mb-5 leading-relaxed" />
-          ),
+          p: (props) => <p {...props} className="!mb-5 leading-relaxed" />,
           // Ensure bullets/numbers are visible even if global CSS resets them
-          ul: ({ node, ...props }) => (
+          ul: (props) => (
             <ul {...props} className="list-disc list-outside pl-6 my-4" />
           ),
-          ol: ({ node, ...props }) => (
+          ol: (props) => (
             <ol {...props} className="list-decimal list-outside pl-6 my-4" />
           ),
-          li: ({ node, ...props }) => <li {...props} className="my-1" />,
+          li: (props) => <li {...props} className="my-1" />,
         }}
       >
         {description}

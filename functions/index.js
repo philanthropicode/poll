@@ -1,10 +1,12 @@
-import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
+import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineSecret } from "firebase-functions/params";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
+import process from "node:process";
+
 import { latLngToCell, cellToParent, polygonToCells } from "h3-js";
 
 // Initialize Admin SDK once (Cloud Functions runtime)

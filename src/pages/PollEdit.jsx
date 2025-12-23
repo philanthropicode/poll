@@ -6,7 +6,7 @@ import {
   collection, addDoc, onSnapshot, deleteDoc, serverTimestamp
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 import ShareButton from "../components/ShareButton";
 import SimpleMDE from "react-simplemde-editor";
 import "easymde/dist/easymde.min.css";

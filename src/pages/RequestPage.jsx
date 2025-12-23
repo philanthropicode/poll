@@ -5,7 +5,7 @@ import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../lib/firebase";
 
 // Optional: if you have auth context and want to attach uid
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 
 const SUBJECT_LABELS = {
   sales: "Sales Inquiry",

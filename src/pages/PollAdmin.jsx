@@ -10,7 +10,7 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 
 export default function PollAdminPage() {
   const { id: pollId } = useParams();
