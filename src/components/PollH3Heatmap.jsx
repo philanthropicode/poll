@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // src/components/PollH3Heatmap.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
@@ -23,6 +24,15 @@ function buildColorExpression(min, max) {
 }
 
 import { cellToBoundary } from "h3-js";
+=======
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import mapboxgl from "mapbox-gl";
+import "mapbox-gl/dist/mapbox-gl.css";
+import { cellToBoundary } from "h3-js";
+import { getH3AggCallable } from "../lib/callables";
+import { generateTestH3Data } from "../lib/testData";
+import "./map.css";
+>>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
 
 // Simple object types (JSDoc for editor hints)
 /**
@@ -64,6 +74,10 @@ export default function PollH3Heatmap({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [aggs, setAggs] = useState([]);
+<<<<<<< HEAD
+=======
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+>>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
 
   function boundsFromMap(map) {
     if (!map?.isStyleLoaded?.()) return null;
@@ -99,12 +113,40 @@ export default function PollH3Heatmap({
     return { min, max };
   }
 
+<<<<<<< HEAD
+=======
+  const PALETTE = ["#2c7bb6","#abd9e9","#ffffbf","#fdae61","#d7191c"];
+
+  function buildColorExpression(min, max) {
+    return [
+      "interpolate", ["linear"], ["get", "value"],
+      min, PALETTE[0],
+      min + (max - min) * 0.25, PALETTE[1],
+      min + (max - min) * 0.5,  PALETTE[2],
+      min + (max - min) * 0.75, PALETTE[3],
+      max, PALETTE[4],
+    ];
+  }
+
+>>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
   const domain = useMemo(() => computeDomain(aggs), [aggs]);
 
   // Initialize map
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
+<<<<<<< HEAD
     mapboxgl.accessToken = mapboxToken;
+=======
+    
+    if (!mapboxToken) {
+      console.error('Mapbox token is missing!');
+      setError('Mapbox token is required');
+      return;
+    }
+    
+    mapboxgl.accessToken = mapboxToken;
+    console.log('Initializing map with token:', mapboxToken.substring(0, 10) + '...');
+>>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
 
     const map = new mapboxgl.Map({
       container: containerRef.current,
@@ -118,7 +160,15 @@ export default function PollH3Heatmap({
     map.addControl(new mapboxgl.AttributionControl({ compact: true }));
 
     map.on("load", () => {
+<<<<<<< HEAD
       map.addSource("h3-aggs", { type: "geojson", data: toGeoJSON([]) });
+=======
+      console.log('Map loaded, adding sources and layers');
+      
+      map.addSource("h3-aggs", { type: "geojson", data: toGeoJSON([]) });
+      console.log('Added h3-aggs source');
+      
+>>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
       map.addLayer({
         id: "h3-fill",
         type: "fill",
@@ -129,13 +179,24 @@ export default function PollH3Heatmap({
           "fill-outline-color": "#ffffff",
         },
       });
+<<<<<<< HEAD
+=======
+      console.log('Added h3-fill layer');
+      
+>>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
       map.addLayer({
         id: "h3-outline",
         type: "line",
         source: "h3-aggs",
         paint: { "line-color": "#ffffff", "line-width": 0.25, "line-opacity": 0.6 },
       });
+<<<<<<< HEAD
       void refreshAggs(map);
+=======
+      console.log('Added h3-outline layer');
+      
+      // Don't call refreshAggs here - do it after moveend listener is set up
+>>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
     });
 
     // Debounced refresh on move end
@@ -143,6 +204,7 @@ export default function PollH3Heatmap({
     const schedule = () => {
       if (t) clearTimeout(t);
       t = setTimeout(() => {
+<<<<<<< HEAD
         if (map.isStyleLoaded()) void refreshAggs(map);
       }, 250);
     };
@@ -150,6 +212,24 @@ export default function PollH3Heatmap({
     map.on("moveend", schedule);
     mapRef.current = map;
     return () => {
+=======
+        if (map.isStyleLoaded()) void refreshAggs(map); // Always fit bounds when loading data
+      }, 500); // Increased debounce time
+    };
+
+    map._scheduleRefresh = schedule; // Store reference for temporary removal
+    map.on("moveend", schedule);
+    
+    // Now do the initial load after everything is set up
+    setTimeout(() => {
+      if (map.isStyleLoaded()) {
+        void refreshAggs(map);
+      }
+    }, 100);
+    mapRef.current = map;
+    return () => {
+      if (t) clearTimeout(t);
+>>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
       map.off("moveend", schedule);
       map.remove();
       mapRef.current = null;
@@ -169,11 +249,18 @@ export default function PollH3Heatmap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
+<<<<<<< HEAD
     void refreshAggs(map);
+=======
+    // Reset hasLoadedOnce when question changes to fetch without bounds
+    setHasLoadedOnce(false);
+    void refreshAggs(map); // Always fit bounds when loading data
+>>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedQ, resolution]);
 
   async function refreshAggs(map) {
+<<<<<<< HEAD
     if (!selectedQ) return;
     setLoading(true);
     setError(null);
@@ -190,6 +277,68 @@ export default function PollH3Heatmap({
       if (source) source.setData(toGeoJSON(result));
     } catch (e) {
       console.error(e);
+=======
+    if (!selectedQ) {
+      console.log('No question selected, skipping refresh');
+      return;
+    }
+    
+    if (!map || !map.isStyleLoaded() || !map.getSource("h3-aggs")) {
+      console.log('Map not ready, skipping refresh');
+      return;
+    }
+    
+    console.log('Refreshing aggregates for:', { pollId, questionId: selectedQ, resolution });
+    console.log('Available questions:', questions.map(q => ({ id: q.id, label: q.label })));
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const b = boundsFromMap(map);
+      console.log('Map bounds:', b);
+      
+      // Always fetch without bounds to get all available data
+      const result = await fetchAggs({
+        pollId,
+        questionId: selectedQ,
+        bounds: undefined, // Never use bounds for now to avoid empty results
+        resolution
+      });
+      
+      setHasLoadedOnce(true);
+      
+      console.log('Fetch result:', result);
+      console.log('Selected question ID:', selectedQ);
+      setAggs(result);
+      
+      const source = map.getSource("h3-aggs");
+      if (source && source.setData) {
+        const geoJSON = toGeoJSON(result);
+        console.log('Generated GeoJSON:', geoJSON);
+        source.setData(geoJSON);
+        
+        // Fit bounds whenever we have hexagon data to show
+        if (result.length > 0 && geoJSON.features.length > 0) {
+          console.log('Fitting bounds to', result.length, 'hexagons');
+          const bounds = new mapboxgl.LngLatBounds();
+          geoJSON.features.forEach(feature => {
+            feature.geometry.coordinates[0].forEach(coord => {
+              bounds.extend(coord);
+            });
+          });
+          // Temporarily disable moveend listener during fitBounds
+          map.off("moveend", map._scheduleRefresh);
+          map.fitBounds(bounds, { padding: 50 });
+          setTimeout(() => {
+            if (map._scheduleRefresh) map.on("moveend", map._scheduleRefresh);
+          }, 1000);
+        } else {
+          console.log('No hexagons to display');
+        }
+      }
+    } catch (e) {
+      console.error('Error in refreshAggs:', e);
+>>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
       setError(e?.message || "Failed to load data");
     } finally {
       setLoading(false);
@@ -221,10 +370,27 @@ export default function PollH3Heatmap({
       </div>
 
       {/* Map */}
+<<<<<<< HEAD
       <div
         ref={containerRef}
         className="relative z-0 w-full grow min-h-[420px] rounded-2xl overflow-hidden shadow"
       />
+=======
+      <div className="relative z-0 w-full grow min-h-[420px] rounded-2xl overflow-hidden shadow">
+        {!loading && !error && aggs.length === 0 && (
+          <div className="absolute z-10 m-3 p-3 text-sm bg-white/95 rounded-lg border shadow-sm max-w-xs">
+            <div className="font-medium text-gray-800 mb-1">No map data available</div>
+            <div className="text-xs text-gray-600">
+              This could mean no submissions exist yet, or users haven't provided location data.
+            </div>
+          </div>
+        )}
+        <div
+          ref={containerRef}
+          className="map-container w-full h-full"
+        />
+      </div>
+>>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
 
       {/* Legend */}
       <Legend min={domain.min} max={domain.max} />
@@ -233,6 +399,10 @@ export default function PollH3Heatmap({
 }
 
 function Legend({ min, max }) {
+<<<<<<< HEAD
+=======
+  const PALETTE = ["#2c7bb6","#abd9e9","#ffffbf","#fdae61","#d7191c"];
+>>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
   return (
     <div className="grid grid-cols-12 gap-2 items-center">
       <span className="text-xs text-gray-600 justify-self-end col-span-1">{min}</span>
@@ -247,5 +417,51 @@ function Legend({ min, max }) {
   );
 }
 
+<<<<<<< HEAD
 // Example fetchAggs implementation lives in src/lib/exampleFetchAggs.js to preserve fast refresh.
 
+=======
+// Example fetchAggs implementation with test data fallback
+export async function exampleFetchAggs({ pollId, questionId, bounds, resolution }) {
+  try {
+    // Only pass bounds if every edge is a finite number and the rectangle is valid.
+    const finite =
+      bounds &&
+      [bounds.west, bounds.south, bounds.east, bounds.north].every(Number.isFinite) &&
+      bounds.west < bounds.east &&
+      bounds.south < bounds.north;
+
+    // Client-side bounds validation to prevent server memory issues
+    if (finite) {
+      const area = Math.abs((bounds.east - bounds.west) * (bounds.north - bounds.south));
+      const maxArea = resolution >= 8 ? 25 : resolution >= 7 ? 100 : 400;
+      if (area > maxArea) {
+        console.warn(`Bounds area ${area.toFixed(2)} too large for resolution ${resolution}, returning empty`);
+        return [];
+      }
+      if (area < 0.0001) {
+        console.warn(`Bounds area ${area.toFixed(6)} too small, returning empty`);
+        return [];
+      }
+    }
+
+    const payload = finite
+      ? {
+          pollId,
+          questionId,
+          res: resolution,
+          west: bounds.west,
+          south: bounds.south,
+          east: bounds.east,
+          north: bounds.north,
+        }
+      : { pollId, questionId, res: resolution };
+
+    const { data } = await getH3AggCallable(payload);
+    return (data && data.aggs) ? data.aggs : [];
+  } catch (error) {
+    console.error('Firebase function failed:', error.message);
+    return [];
+  }
+}
+>>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1

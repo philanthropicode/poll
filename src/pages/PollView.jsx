@@ -1,5 +1,9 @@
 // src/pages/PollView.jsx
+<<<<<<< HEAD
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+=======
+import React, { useEffect, useMemo, useRef, useState } from "react";
+>>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
 import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   doc,
@@ -18,8 +22,12 @@ import { useAuth } from "../context/useAuth";
 import ShareButton from "../components/ShareButton";
 import PollDescription from "../components/PollDescription";
 import PollH3Heatmap from "../components/PollH3Heatmap";
+<<<<<<< HEAD
 import { exampleFetchAggs as fetchAggs } from "../lib/exampleFetchAggs";
 import { exportPollCsv, finalizeSubmission as finalizeSubmissionFn, rollupNow as rollupNowFn } from "../lib/callables";
+=======
+import { exportPollCsv, finalizeSubmission as finalizeSubmissionFn, rollupNow as rollupNowFn, getH3AggCallable } from "../lib/callables";
+>>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
 
 // ---- helpers ---------------------------------------------------------------
 function formatDateStr(d) {
@@ -38,6 +46,41 @@ function ymd(date) {
   const d = String(date.getUTCDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
 }
+<<<<<<< HEAD
+=======
+
+// Fetch H3 aggregates (no bounds: return all; supports bounds if you enable windowing later)
+async function fetchAggs({ pollId, questionId, bounds, resolution }) {
+  const finite =
+    bounds &&
+    [bounds.west, bounds.south, bounds.east, bounds.north].every(Number.isFinite) &&
+    bounds.west < bounds.east &&
+    bounds.south < bounds.north;
+
+  const payload = finite
+    ? {
+        pollId,
+        questionId,
+        res: resolution,
+        west: bounds.west,
+        south: bounds.south,
+        east: bounds.east,
+        north: bounds.north,
+      }
+    : { pollId, questionId, res: resolution };
+
+  const { data } = await getH3AggCallable(payload);
+  return (data && data.aggs) ? data.aggs : [];
+}
+
+// Helper functions for profile location
+function normState(s) {
+  return String(s || "").trim().slice(0, 2).toUpperCase() || null;
+}
+function normZip(z) {
+  return String(z || "").replace(/\D/g, "").padStart(5, "0").slice(0, 5) || null;
+}
+>>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
 // ---------------------------------------------------------------------------
 
 export default function PollViewPage() {
@@ -60,6 +103,7 @@ export default function PollViewPage() {
   const [err, setErr] = useState("");
   const [submittedAt, setSubmittedAt] = useState(null); // Timestamp | Date | null
   const [hasSubmitted, setHasSubmitted] = useState(false);
+<<<<<<< HEAD
 
   // export options
   const [exporting, setExporting] = useState(false);
@@ -74,6 +118,73 @@ export default function PollViewPage() {
   const [heatmapVersion, setHeatmapVersion] = useState(0);
 
 
+  // Keep latest answers available to handlers
+  const answersRef = useRef(answers);
+=======
+
+  // admin visibility for export
+  const [isAdmin, setIsAdmin] = useState(false);         // global admin via custom claim
+  const [isPollAdmin, setIsPollAdmin] = useState(false); // owner/global or listed on poll
+
+  // export options
+  const [exporting, setExporting] = useState(false);
+  const [exComments, setExComments] = useState(false);
+  const [exLocation, setExLocation] = useState(false);
+
+  const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN || "";
+
+  // admin + heatmap refresh
+  const [rebuildBusy, setRebuildBusy] = useState(false);
+  const [heatmapVersion, setHeatmapVersion] = useState(0);
+  const [profileLoc, setProfileLoc] = useState(null);
+
+  // Load profile location (for stamping submissions)
+>>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
+
+  // Detect admin claim for rollup button
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+<<<<<<< HEAD
+      try {
+        if (!user) { if (!cancelled) setIsAdmin(false); return; }
+        const res = await user.getIdTokenResult(true);
+        if (!cancelled) setIsAdmin(!!res?.claims?.admin);
+      } catch {
+        if (!cancelled) setIsAdmin(false);
+      }
+=======
+      if (!user) {
+        setProfileLoc(null);
+        setIsAdmin(false);
+        return;
+      }
+
+      // get custom claims for global admin
+      try {
+        const tokenResult = await user.getIdTokenResult(true);
+        setIsAdmin(!!tokenResult.claims?.admin);
+      } catch (_) {
+        setIsAdmin(false);
+      }
+
+      const snap = await getDoc(doc(db, "profiles", user.uid));
+      const p = snap.data() || {};
+      setProfileLoc({
+        city: (p.city || "").trim() || null,
+        state: normState(p.state || ""),
+        zip: normZip(p.zip || ""),
+      });
+>>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
+
+<<<<<<< HEAD
+=======
   // Keep latest answers available to handlers
   const answersRef = useRef(answers);
   useEffect(() => {
@@ -95,11 +206,24 @@ export default function PollViewPage() {
     return () => { cancelled = true; };
   }, [user]);
 
+>>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
   // Load poll + questions; hydrate existing user submissions and status
   useEffect(() => {
     (async () => {
       const snap = await getDoc(pollRef);
-      if (snap.exists()) setPoll({ id: snap.id, ...snap.data() });
+      if (snap.exists()) {
+        const pollData = { id: snap.id, ...snap.data() };
+        setPoll(pollData);
+        // compute poll-admin (owner, global admin, or listed in admins/adminsMap)
+        if (user) {
+          const owner = user.uid === pollData.createdBy;
+          const arrayListed = Array.isArray(pollData.admins) && pollData.admins.includes(user.uid);
+          const mapListed = pollData.adminsMap && typeof pollData.adminsMap === "object" && !!pollData.adminsMap[user.uid];
+          setIsPollAdmin(owner || arrayListed || mapListed);
+        } else {
+          setIsPollAdmin(false);
+        }
+      };
 
       const qsSnap = await getDocs(questionsRef);
       const items = [];
@@ -153,6 +277,7 @@ export default function PollViewPage() {
   }, [pollRef, questionsRef, user, pollId]);
 
   async function handleExport(includeComments, includeLocation) {
+<<<<<<< HEAD
     try {
       setExporting(true);
       const { data } = await exportPollCsv({
@@ -173,6 +298,65 @@ export default function PollViewPage() {
       } else if (data.kind === "url") {
         window.open(data.url, "_blank", "noopener");
       }
+=======
+    try {
+      setExporting(true);
+      const { data } = await exportPollCsv({
+        pollId,
+        includeComments,
+        includeLocation,
+      });
+      if (data.kind === "inline") {
+        const blob = new Blob([data.csv], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = data.filename || `poll-${pollId}-export.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } else if (data.kind === "url") {
+        window.open(data.url, "_blank", "noopener");
+      }
+    } catch (e) {
+      setErr(e.message || "Export failed");
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  function submissionDocIdFor(qid) {
+    return `${pollId}__${user.uid}__${qid}`;
+  }
+  function statusDocId() {
+    return `${pollId}__${user.uid}__status`;
+  }
+
+  async function persistAnswer(qid, next) {
+    if (!user) {
+      setErr("Please sign in to submit responses.");
+      return;
+    }
+    setSavingIds((s) => ({ ...s, [qid]: true }));
+    try {
+      const payload = {
+        pollId,
+        userId: user.uid,
+        questionId: qid,
+        value: next.value,
+        submitted: false,
+        updatedAt: serverTimestamp(),
+      };
+      payload.comment =
+        next.comment && next.comment.trim().length > 0
+          ? next.comment.trim()
+          : null;
+
+      await setDoc(doc(db, "submissions", submissionDocIdFor(qid)), payload, {
+        merge: true,
+      });
+>>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
     } catch (e) {
       setErr(e.message || "Export failed");
     } finally {
@@ -233,7 +417,11 @@ export default function PollViewPage() {
     () => () => {
       saveAllFromState();
     },
+<<<<<<< HEAD
     [saveAllFromState]
+=======
+    []
+>>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
   );
 
   // Comment helpers
@@ -335,6 +523,22 @@ export default function PollViewPage() {
     return <div className="p-6 text-sm text-gray-600">Poll not found.</div>;
 
   const isOwner = user?.uid === poll.createdBy;
+  const canSeeExport = !!user && (hasSubmitted || isOwner || isAdmin || isPollAdmin);
+
+  // Only show map if the signed-in user submitted before the poll deadline
+  const toJSDate = (t) => (t?.toDate ? t.toDate() : t instanceof Date ? t : null);
+  const pollDueAt =
+    (poll?.dueAt && toJSDate(poll.dueAt)) ||
+    (poll?.dueDate
+      ? (() => {
+          const [y, m, d] = String(poll.dueDate).split("-").map(Number);
+          // End-of-day local time for YYYY-MM-DD due date
+          return new Date(y, (m || 1) - 1, d || 1, 23, 59, 59, 999);
+        })()
+      : null);
+  const submittedDate = toJSDate(submittedAt);
+  const canSeeMap =
+    !!user && hasSubmitted && (!pollDueAt || (submittedDate && submittedDate <= pollDueAt));
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -386,8 +590,13 @@ export default function PollViewPage() {
         </div>
       </div>
 
+<<<<<<< HEAD
       {/* Export (visible to signed-in users who submitted) */}
       {user && hasSubmitted && (
+=======
+      {/* Export (visible to submitters OR poll admins/owner/global admin) */}
+      {canSeeExport && (
+>>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
         <section className="rounded-2xl border p-4">
           <h3 className="mb-2 font-medium">Export</h3>
           <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -435,19 +644,36 @@ export default function PollViewPage() {
       <section className="rounded-2xl border p-4 overflow-hidden">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-lg font-medium">Community heatmap</h2>
+<<<<<<< HEAD
           {isAdmin && (
+=======
+          {isPollAdmin && (
+>>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
             <button
               className="rounded-xl border px-3 py-1 text-sm hover:bg-gray-50 disabled:opacity-60"
               disabled={rebuildBusy}
               onClick={async () => {
                 try {
                   setRebuildBusy(true);
+<<<<<<< HEAD
                   await rollupNowFn({ pollId });
                   // Force heatmap to remount/refetch
                   setHeatmapVersion((v) => v + 1);
                 } catch (e) {
                   console.error(e);
                   setErr(e?.message || "Failed to rebuild heatmap");
+=======
+                  console.log('Calling rollupNow with pollId:', pollId);
+                  console.log('User auth state:', user?.uid, user?.emailVerified);
+                  const result = await rollupNowFn({ pollId });
+                  console.log('Rollup result:', result);
+                  // Force heatmap to remount/refetch
+                  setHeatmapVersion((v) => v + 1);
+                  setErr('Rollup completed successfully!');
+                } catch (e) {
+                  console.error('Rollup error:', e);
+                  setErr(`Rollup failed: ${e?.message || e}. Try signing out and back in.`);
+>>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
                 } finally {
                   setRebuildBusy(false);
                 }
@@ -460,6 +686,7 @@ export default function PollViewPage() {
         </div>
 
         
+<<<<<<< HEAD
           <PollH3Heatmap
             key={heatmapVersion}
             pollId={pollId}
@@ -473,6 +700,31 @@ export default function PollViewPage() {
         <p className="mt-2 text-xs text-gray-600">
           Map updates after scheduled rollups (every 3 hours). Admins can force a rebuild.
         </p>
+=======
+        {canSeeMap ? (
+          <>
+            <PollH3Heatmap
+              key={heatmapVersion}
+              pollId={pollId}
+              mapboxToken={mapboxToken}
+              questions={questions.map(q => ({ id: q.id, label: q.text || "" }))}
+              defaultQuestionId={questions[0]?.id}
+              resolution={8}
+              fetchAggs={fetchAggs}
+            />
+            <p className="mt-2 text-xs text-gray-600">
+              Map updates after scheduled rollups (every 3 hours). Admins can force a rebuild.
+            </p>
+          </>
+        ) : (
+          <div className="rounded-xl border bg-gray-50 p-4 text-sm text-gray-700">
+            <p className="mb-2 font-medium">Heatmap locked</p>
+            <p>
+              Cast your vote and submit before the poll deadline to unlock the community heatmap.
+            </p>
+          </div>
+        )}
+>>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
       </section>
 
       {/* Questions with sliders + comments */}

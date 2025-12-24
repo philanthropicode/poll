@@ -28,7 +28,10 @@ dist-ssr
 .env.local
 .env.*.local
 
+<<<<<<< HEAD
 # firebase project selectors
 .firebaserc
 
+=======
+>>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
 scripts/serviceAccount.json
