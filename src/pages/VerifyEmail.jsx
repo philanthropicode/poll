@@ -1,7 +1,7 @@
 // src/pages/VerifyEmail.jsx
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 
 export default function VerifyEmailPage() {
   const { user, sendVerification, refreshUser } = useAuth();
