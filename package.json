@@ -11,10 +11,6 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.12",
-<<<<<<< HEAD
-=======
-    "d3-scale": "^4.0.2",
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
     "easymde": "^2.20.0",
     "firebase": "^12.1.0",
     "firebase-admin": "^13.5.0",

@@ -1,20 +1,11 @@
-<<<<<<< HEAD
 import { onCall, HttpsError } from "firebase-functions/v2/https";
-=======
-// functions/index.js
-import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineSecret } from "firebase-functions/params";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
-<<<<<<< HEAD
 import process from "node:process";
-
-=======
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
 import { latLngToCell, cellToParent, polygonToCells } from "h3-js";
 
 // Initialize Admin SDK once (Cloud Functions runtime)
@@ -163,34 +154,26 @@ async function rollupPoll(pollId) {
     }
     if (!h3id) continue;
 
-<<<<<<< HEAD
-    // Normalize to r9 then compute parents
-    const r9 = h3res === 9 ? h3id : cellToParent(h3id, 9);
-    const r8 = cellToParent(r9, 8);
-    const r7 = cellToParent(r9, 7);
-=======
     // Normalize to appropriate resolutions
-    let r9, r8, r7;
+    let r9;
+    let r8;
+    let r7;
     try {
       if (h3res === 9) {
         r9 = h3id;
         r8 = cellToParent(r9, 8);
         r7 = cellToParent(r9, 7);
       } else if (h3res === 8) {
-        // Use r8 value for all resolutions (privacy-preserving)
-        r9 = h3id;  // Use r8 value
+        r9 = h3id; // reuse coarse id for finer slots
         r8 = h3id;
         r7 = cellToParent(r8, 7);
       } else if (h3res === 7) {
-        // Use r7 value for all resolutions
-        r9 = h3id;  // Use r7 value
-        r8 = h3id;  // Use r7 value
+        r9 = h3id;
+        r8 = h3id;
         r7 = h3id;
       } else if (h3res < 7) {
-        // Skip very low resolution data
-        continue;
+        continue; // skip extremely coarse data
       } else {
-        // Higher than r9, convert down
         r9 = cellToParent(h3id, 9);
         r8 = cellToParent(r9, 8);
         r7 = cellToParent(r9, 7);
@@ -199,7 +182,6 @@ async function rollupPoll(pollId) {
       console.warn(`Skipping invalid H3 cell ${h3id} at resolution ${h3res}:`, e.message);
       continue;
     }
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
 
     const v = Number.isFinite(s.value) ? Number(s.value) : 0;
     const qid = String(s.questionId);
@@ -292,63 +274,30 @@ export const scheduledRollup = onSchedule(
 
 // ================ ADMIN CALLABLE =======================
 export const rollupNow = onCall({ region: "us-central1" }, async (req) => {
-<<<<<<< HEAD
   if (!isAdminReq(req)) throw new HttpsError("permission-denied", "Admin only");
   const pollId = String(req.data?.pollId || "");
   if (!pollId) throw new HttpsError("invalid-argument", "pollId required");
   return await rollupPoll(pollId);
-=======
-  try {
-    console.log("rollupNow called with:", req.data);
-    console.log("Auth UID:", req.auth?.uid);
-    console.log("ALLOW_ADMINS:", process.env.ALLOW_ADMINS);
-    
-    if (!isAdminReq(req)) {
-      console.log("Admin check failed");
-      throw new HttpsError("permission-denied", "Admin only");
-    }
-    
-    const pollId = String(req.data?.pollId || "");
-    if (!pollId) throw new HttpsError("invalid-argument", "pollId required");
-    
-    console.log("Starting rollup for pollId:", pollId);
-    const result = await rollupPoll(pollId);
-    console.log("Rollup completed:", result);
-    return result;
-  } catch (error) {
-    console.error("rollupNow error:", error);
-    throw error;
-  }
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
 });
 
  
 // ================ READ API (Callable) ======================
 // Callable equivalent of getH3Agg (dev-friendly; no CORS/proxy)
 export const getH3AggCallable = onCall(
-<<<<<<< HEAD
-  { region: "us-central1", timeoutSeconds: 60, memory: "256MiB" },
-  async (req) => {
-    try {
-      const d = req.data || {};
-=======
-  { region: "us-central1", timeoutSeconds: 30, memory: "512MiB" },
+  { region: "us-central1", timeoutSeconds: 60, memory: "512MiB" },
   async (req) => {
     try {
       const d = req.data || {};
       const uid = req.auth?.uid;
-      if (!uid) {
-        throw new HttpsError("unauthenticated", "Sign in required");
-      }
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
+      if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
+
       const pollId = String(d.pollId || "");
       const questionId = String(d.questionId || "");
       const reso = Number(d.res ?? 8);
 
-      // Parse bounds as numbers; they may be undefined on first load
-      const west  = d.west  != null ? Number(d.west)  : NaN;
+      const west = d.west != null ? Number(d.west) : NaN;
       const south = d.south != null ? Number(d.south) : NaN;
-      const east  = d.east  != null ? Number(d.east)  : NaN;
+      const east = d.east != null ? Number(d.east) : NaN;
       const north = d.north != null ? Number(d.north) : NaN;
 
       if (!pollId || !questionId) {
@@ -358,31 +307,25 @@ export const getH3AggCallable = onCall(
         throw new HttpsError("invalid-argument", "res must be an integer between 0 and 15");
       }
 
-<<<<<<< HEAD
-=======
-      // ---- permission check (submitter OR poll admin/owner/global) ----
       const pollSnap = await db.doc(`polls/${pollId}`).get();
       if (!pollSnap.exists) throw new HttpsError("not-found", "poll not found");
       const poll = pollSnap.data() || {};
       const isOwner = poll.createdBy === uid;
       const isGlobalAdmin = req.auth?.token?.admin === true;
       const arrayListed = Array.isArray(poll.admins) && poll.admins.includes(uid);
-      const mapListed =
-        poll.adminsMap && typeof poll.adminsMap === "object" && !!poll.adminsMap[uid];
+      const mapListed = poll.adminsMap && typeof poll.adminsMap === "object" && !!poll.adminsMap[uid];
       const isPollAdmin = isOwner || isGlobalAdmin || arrayListed || mapListed;
 
       const statusId = `${pollId}__${uid}__status`;
       const statusSnap = await db.doc(`submissions/${statusId}`).get();
       const isSubmitter = statusSnap.exists;
-
       if (!isSubmitter && !isPollAdmin) {
         throw new HttpsError(
           "permission-denied",
-          "Viewing aggregates requires submitting a response or being a poll admin"
+          "Viewing aggregates requires submitting a response or being a poll admin",
         );
       }
 
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
       const haveBounds = [west, south, east, north].every(Number.isFinite);
       if (haveBounds && (west >= east || south >= north)) {
         throw new HttpsError("invalid-argument", "bounds are invalid (west<east, south<north required)");
@@ -391,89 +334,56 @@ export const getH3AggCallable = onCall(
       const col = db.collection(`polls/${pollId}/h3Agg_r${reso}`);
       const aggs = [];
 
+      let cells = null;
       if (haveBounds) {
-<<<<<<< HEAD
-=======
-        // Strict bounds validation to prevent memory issues
         const area = Math.abs((east - west) * (north - south));
-        const maxArea = reso >= 8 ? 25 : reso >= 7 ? 100 : 400; // Smaller areas for higher resolution
-        if (area > maxArea) {
-          throw new HttpsError("invalid-argument", `bounds area ${area.toFixed(2)} too large for resolution ${reso}`);
-        }
-
-        // Additional validation: prevent very small bounds that could cause issues
-        if (area < 0.00001) {
-          throw new HttpsError("invalid-argument", "bounds area too small");
-        }
-
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
-        // rectangle ring (lng,lat) closed
-        const rect = [
-          [west, south],
-          [east, south],
-          [east, north],
-          [west, north],
-          [west, south],
-        ];
-
-        let cells;
-        try {
-          // h3-js v4: polygonToCells expects an array of loops
-          cells = polygonToCells([rect], reso, false);
-<<<<<<< HEAD
-        } catch (err) {
-          console.error("polygonToCells failed", { err, reso, west, south, east, north });
-          throw new HttpsError("invalid-argument", "bounds polygon failed");
-=======
-          console.log(`Generated ${cells.length} cells for bounds area ${area.toFixed(4)}`);
-          
-          // Strict cell count limits based on resolution
-          const maxCells = reso >= 8 ? 1000 : reso >= 7 ? 2000 : 5000;
-          if (cells.length > maxCells) {
-            throw new Error(`Too many cells: ${cells.length} > ${maxCells} for resolution ${reso}`);
+        if (area >= 0.00001 && area <= 400) {
+          const rect = [
+            [west, south],
+            [east, south],
+            [east, north],
+            [west, north],
+            [west, south],
+          ];
+          try {
+            const candidate = polygonToCells([rect], reso, true);
+            if (candidate.length <= 8000) cells = candidate;
+          } catch (err) {
+            console.error("polygonToCells failed (falling back to unbounded)", {
+              err, reso, west, south, east, north,
+            });
           }
-        } catch (err) {
-          console.error("polygonToCells failed", { err, reso, west, south, east, north, area });
-          throw new HttpsError("invalid-argument", `bounds polygon failed: ${err.message}`);
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
         }
+      }
 
-        // Batch IN queries (Firestore supports up to 30 ids per IN)
+      if (cells) {
+        const batches = [];
         for (let i = 0; i < cells.length; i += 30) {
           const slice = cells.slice(i, i + 30);
-          if (!slice.length) continue;
-          const snap = await col.where("__name__", "in", slice).get();
+          if (slice.length) batches.push(col.where("__name__", "in", slice).get());
+        }
+        const snaps = await Promise.all(batches);
+        for (const snap of snaps) {
           snap.forEach((d) => {
             const s = (d.data() || {}).stats?.[questionId];
             if (s && typeof s.sum === "number") aggs.push({ h3: d.id, sum: s.sum });
           });
         }
       } else {
-<<<<<<< HEAD
-        // No bounds provided: return all (OK for demos; avoid at scale)
-        const snap = await col.get();
-=======
-        // No bounds provided: return very limited results to prevent memory issues
-        const snap = await col.limit(100).get();
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
+        const snap = await col.limit(1000).get();
         snap.forEach((d) => {
           const s = (d.data() || {}).stats?.[questionId];
           if (s && typeof s.sum === "number") aggs.push({ h3: d.id, sum: s.sum });
         });
-<<<<<<< HEAD
-=======
-        console.log(`No bounds provided, returned ${aggs.length} cells`);
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
       }
 
       return { aggs };
     } catch (e) {
-      // Always throw HttpsError so the client doesn’t see a fake "CORS" error
       console.error("getH3AggCallable error", e, { data: req?.data });
       if (e instanceof HttpsError) throw e;
       throw new HttpsError("internal", "getH3AggCallable crashed");
     }
-  }
+  },
 );
 
  
@@ -551,134 +461,102 @@ export const saveUserAddress = onCall(
 
 // ==================== CSV EXPORT =======================
 // Note: Do NOT export H3 values. City/State/ZIP optional via includeLocation
-<<<<<<< HEAD
-export const exportPollCsv = onCall(
-  { region: "us-central1", cors: true },
-  async (req) => {
-    const uid = req.auth?.uid;
-    if (!uid) throw new Error("unauthenticated");
-
-    const { pollId, includeComments = false, includeLocation = false } =
-      req.data || {};
-    if (!pollId) throw new Error("invalid-argument: pollId required");
-
-    // Optional: only allow export by participants; require a status doc
-    const statusId = `${pollId}__${uid}__status`;
-    const statusSnap = await db.doc(`submissions/${statusId}`).get();
-    if (!statusSnap.exists)
-      throw new Error("permission-denied: submit the poll first");
-=======
 export const exportPollCsv = onCall({ region: "us-central1", cors: true }, async (req) => {
-    const uid = req.auth?.uid;
-    if (!uid) throw new Error("unauthenticated");
+  const uid = req.auth?.uid;
+  if (!uid) throw new Error("unauthenticated");
 
-    const { pollId, includeComments = false, includeLocation = false } = req.data || {};
-    if (!pollId) throw new Error("invalid-argument: pollId required");
+  const { pollId, includeComments = false, includeLocation = false } = req.data || {};
+  if (!pollId) throw new Error("invalid-argument: pollId required");
 
-    const db = getFirestore();
+  const pollSnap = await db.doc(`polls/${pollId}`).get();
+  if (!pollSnap.exists) throw new Error("not-found: poll not found");
+  const poll = pollSnap.data() || {};
+  const isOwner = poll.createdBy === uid;
+  const isGlobalAdmin = req.auth?.token?.admin === true;
+  const arrayListed = Array.isArray(poll.admins) && poll.admins.includes(uid);
+  const mapListed = poll.adminsMap && typeof poll.adminsMap === "object" && !!poll.adminsMap[uid];
+  const isPollAdmin = isOwner || isGlobalAdmin || arrayListed || mapListed;
 
-    // --- determine permissions (owner/global admin/listed admin) --------------
-    const pollSnap = await db.doc(`polls/${pollId}`).get();
-    if (!pollSnap.exists) throw new Error("not-found: poll not found");
-    const poll = pollSnap.data() || {};
-    const isOwner = poll.createdBy === uid;
-    const isGlobalAdmin = req.auth?.token?.admin === true;
-    const arrayListed = Array.isArray(poll.admins) && poll.admins.includes(uid);
-    const mapListed = poll.adminsMap && typeof poll.adminsMap === "object" && !!poll.adminsMap[uid];
-    const isPollAdmin = isOwner || isGlobalAdmin || arrayListed || mapListed;
-
-    // only allow export by participants or admins
-    const statusId = `${pollId}__${uid}__status`;
-    const statusSnap = await db.doc(`submissions/${statusId}`).get();
-    if (!statusSnap.exists && !isPollAdmin) {
-      throw new Error("permission-denied: export requires submitter or poll admin");
-    }
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
-
-    // Fetch questions to label CSV
-    const qsSnap = await db.collection(`polls/${pollId}/questions`).get();
-    const questions = [];
-    qsSnap.forEach((d) =>
-      questions.push({
-        id: d.id,
-        text: d.get("text") || "",
-        order: d.get("order") || 0,
-      })
-    );
-    questions.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-    const qIndex = new Map(
-      questions.map((q, i) => [q.id, { ...q, index: i + 1 }])
-    );
-
-    // Only export submitted==true
-    const subsSnap = await db
-      .collection("submissions")
-      .where("pollId", "==", pollId)
-      .where("submitted", "==", true)
-      .get();
-
-    const respondentIndex = new Map();
-    let nextResp = 1;
-    const rows = [];
-    subsSnap.forEach((d) => {
-      const s = d.data() || {};
-      const q = qIndex.get(s.questionId);
-      if (!q) return;
-
-      if (!respondentIndex.has(s.userId))
-        respondentIndex.set(s.userId, nextResp++);
-      const rec = {
-        respondent: respondentIndex.get(s.userId),
-        questionIndex: q.index,
-        questionId: q.id,
-        question: q.text,
-        value: typeof s.value === "number" ? s.value : "",
-      };
-      if (includeComments && s.comment) rec.comment = s.comment;
-      if (includeLocation && s.location) {
-        if (s.location.city) rec.city = s.location.city;
-        if (s.location.state) rec.state = s.location.state;
-        if (s.location.zip) rec.zip = s.location.zip;
-      }
-      // DO NOT export H3 ids to CSV (privacy)
-      rows.push(rec);
-    });
-
-    const headers = ["respondent", "questionIndex", "questionId", "question", "value"]
-      .concat(includeComments ? ["comment"] : [])
-      .concat(includeLocation ? ["city", "state", "zip"] : []);
-
-    const esc = (v) =>
-      v == null
-        ? ""
-        : /[",\n]/.test(String(v))
-        ? `"${String(v).replace(/"/g, '""')}"`
-        : String(v);
-
-    const csv =
-      [headers.join(",")]
-        .concat(rows.map((r) => headers.map((h) => esc(r[h])).join(",")))
-        .join("\n");
-
-    if (csv.length < 8_000_000) {
-      return { kind: "inline", filename: `poll-${pollId}-export.csv`, csv };
-    } else {
-      const bucket = getStorage().bucket();
-      const file = bucket.file(
-        `exports/polls/${pollId}/export-${Date.now()}.csv`
-      );
-      await file.save(csv, {
-        contentType: "text/csv",
-        cacheControl: "no-store",
-      });
-      const [url] = await file.getSignedUrl({
-        action: "read",
-        expires: Date.now() + 60 * 60 * 1000,
-      });
-      return { kind: "url", url };
-    }
+  const statusId = `${pollId}__${uid}__status`;
+  const statusSnap = await db.doc(`submissions/${statusId}`).get();
+  if (!statusSnap.exists && !isPollAdmin) {
+    throw new Error("permission-denied: export requires submitter or poll admin");
   }
-);
+
+  const qsSnap = await db.collection(`polls/${pollId}/questions`).get();
+  const questions = [];
+  qsSnap.forEach((d) =>
+    questions.push({
+      id: d.id,
+      text: d.get("text") || "",
+      order: d.get("order") || 0,
+    }),
+  );
+  questions.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const qIndex = new Map(questions.map((q, i) => [q.id, { ...q, index: i + 1 }]));
+
+  const subsSnap = await db
+    .collection("submissions")
+    .where("pollId", "==", pollId)
+    .where("submitted", "==", true)
+    .get();
+
+  const respondentIndex = new Map();
+  let nextResp = 1;
+  const rows = [];
+  subsSnap.forEach((d) => {
+    const s = d.data() || {};
+    const q = qIndex.get(s.questionId);
+    if (!q) return;
+
+    if (!respondentIndex.has(s.userId)) respondentIndex.set(s.userId, nextResp++);
+    const rec = {
+      respondent: respondentIndex.get(s.userId),
+      questionIndex: q.index,
+      questionId: q.id,
+      question: q.text,
+      value: typeof s.value === "number" ? s.value : "",
+    };
+    if (includeComments && s.comment) rec.comment = s.comment;
+    if (includeLocation && s.location) {
+      if (s.location.city) rec.city = s.location.city;
+      if (s.location.state) rec.state = s.location.state;
+      if (s.location.zip) rec.zip = s.location.zip;
+    }
+    rows.push(rec);
+  });
+
+  const headers = ["respondent", "questionIndex", "questionId", "question", "value"]
+    .concat(includeComments ? ["comment"] : [])
+    .concat(includeLocation ? ["city", "state", "zip"] : []);
+
+  const esc = (v) =>
+    v == null
+      ? ""
+      : /[",\n]/.test(String(v))
+      ? `"${String(v).replace(/"/g, '""')}"`
+      : String(v);
+
+  const csv = [headers.join(",")]
+    .concat(rows.map((r) => headers.map((h) => esc(r[h])).join(",")))
+    .join("\n");
+
+  if (csv.length < 8_000_000) {
+    return { kind: "inline", filename: `poll-${pollId}-export.csv`, csv };
+  } else {
+    const bucket = getStorage().bucket();
+    const file = bucket.file(`exports/polls/${pollId}/export-${Date.now()}.csv`);
+    await file.save(csv, {
+      contentType: "text/csv",
+      cacheControl: "no-store",
+    });
+    const [url] = await file.getSignedUrl({
+      action: "read",
+      expires: Date.now() + 60 * 60 * 1000,
+    });
+    return { kind: "url", url };
+  }
+});
 
 // ==================== ONE-OFF MIGRATION (Admin) =======================
 // Migrate legacy geo.h3r8 to geo.h3 = { id, res: 8 } for a specific user

@@ -3,11 +3,7 @@ import React, { useEffect, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { applyActionCode } from "firebase/auth";
 import { auth } from "../lib/firebase";
-<<<<<<< HEAD
 import { useAuth } from "../context/useAuth";
-=======
-import { useAuth } from "../context/AuthContext";
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
 
 export default function AuthActionPage() {
   const [params] = useSearchParams();

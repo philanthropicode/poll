@@ -1,11 +1,7 @@
 // src/pages/Home.jsx
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-<<<<<<< HEAD
 import { useAuth } from "../context/useAuth";
-=======
-import { useAuth } from "../context/AuthContext";
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
 import { db } from "../lib/firebase";
 import { collection, query, orderBy, limit, onSnapshot } from "firebase/firestore";
 

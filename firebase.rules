@@ -27,15 +27,11 @@ service cloud.firestore {
       let mapListed = ('adminsMap' in p.data) && (request.auth.uid in p.data.adminsMap);
       return ownerOrGlobal || arrayListed || mapListed;
     }
-<<<<<<< HEAD
-=======
     // A user has “submitted” for this poll if their status doc exists
     function hasSubmitted(pollId, uid) {
-      let sid = pollId + "__" + uid + "__status";   // build the doc id first
-      return isSignedIn() &&
-             exists(/databases/$(database)/documents/submissions/$(sid));
+      let sid = pollId + "__" + uid + "__status";
+      return isSignedIn() && exists(/databases/$(database)/documents/submissions/$(sid));
     }
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
 
     // ================= Polls ==================
     match /polls/{pollId} {
@@ -55,17 +51,6 @@ service cloud.firestore {
 
       // Read-only H3 aggregates per resolution (explicit segments; wildcards can't be partial)
       match /h3Agg_r7/{h3} {
-<<<<<<< HEAD
-        allow read: if true;
-        allow write: if false;
-      }
-      match /h3Agg_r8/{h3} {
-        allow read: if true;
-        allow write: if false;
-      }
-      match /h3Agg_r9/{h3} {
-        allow read: if true;
-=======
         allow read: if isSignedIn() && (isPollAdmin(pollId) || hasSubmitted(pollId, request.auth.uid));
         allow write: if false;
       }
@@ -75,24 +60,19 @@ service cloud.firestore {
       }
       match /h3Agg_r9/{h3} {
         allow read: if isSignedIn() && (isPollAdmin(pollId) || hasSubmitted(pollId, request.auth.uid));
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
         allow write: if false;
       }
     }
 
     // ================= Submissions ==================
-<<<<<<< HEAD
     // Rules cover both per-question docs and the special status doc.
     // - Per-question docs must have id == pollId__uid__questionId
     // - Status doc id typically == pollId__uid__status (no questionId field)
     // Clients may NOT stamp location fields; server stamps them during finalization.
-=======
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
     match /submissions/{id} {
       allow read: if isSignedIn() &&
                   (resource.data.userId == request.auth.uid || isPollAdmin(resource.data.pollId));
 
-<<<<<<< HEAD
       // Create rules
       allow create: if isSignedIn()
         && request.resource.data.userId == request.auth.uid
@@ -128,13 +108,6 @@ service cloud.firestore {
         && !('lng' in request.resource.data)
         && !('h3' in request.resource.data);
 
-=======
-      // Simplified rules for debugging
-      allow create, update: if isSignedIn()
-        && request.resource.data.userId == request.auth.uid
-        && ('pollId' in request.resource.data);
-
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
       allow delete: if false;
     }
 

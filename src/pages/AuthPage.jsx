@@ -1,11 +1,7 @@
 // pages/AuthPage.jsx
 import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-<<<<<<< HEAD
 import { useAuth } from "../context/useAuth";
-=======
-import { useAuth } from "../context/AuthContext";
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
 import { auth } from "../lib/firebase";
 
 export default function AuthPage() {

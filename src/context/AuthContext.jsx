@@ -1,10 +1,6 @@
 // src/context/AuthContext.jsx
-<<<<<<< HEAD
 import React, { useEffect, useState, useRef } from "react";
 import { AuthContext } from "./AuthContextBase";
-=======
-import React, { createContext, useContext, useEffect, useState, useRef } from "react";
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -105,12 +101,3 @@ export function AuthProvider({ children }) {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
-
-<<<<<<< HEAD
-=======
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
-  return ctx;
-}
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1

@@ -1,9 +1,5 @@
 import React, { useEffect, useState } from "react";
-<<<<<<< HEAD
 import { useAuth } from "../context/useAuth";
-=======
-import { useAuth } from "../context/AuthContext";
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
 import { db, functions } from "../lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";

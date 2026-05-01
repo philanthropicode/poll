@@ -1,9 +1,5 @@
 // src/pages/PollView.jsx
-<<<<<<< HEAD
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-=======
-import React, { useEffect, useMemo, useRef, useState } from "react";
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
 import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   doc,
@@ -22,66 +18,31 @@ import { useAuth } from "../context/useAuth";
 import ShareButton from "../components/ShareButton";
 import PollDescription from "../components/PollDescription";
 import PollH3Heatmap from "../components/PollH3Heatmap";
-<<<<<<< HEAD
 import { exampleFetchAggs as fetchAggs } from "../lib/exampleFetchAggs";
-import { exportPollCsv, finalizeSubmission as finalizeSubmissionFn, rollupNow as rollupNowFn } from "../lib/callables";
-=======
-import { exportPollCsv, finalizeSubmission as finalizeSubmissionFn, rollupNow as rollupNowFn, getH3AggCallable } from "../lib/callables";
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
+import {
+  exportPollCsv,
+  finalizeSubmission as finalizeSubmissionFn,
+  rollupNow as rollupNowFn,
+} from "../lib/callables";
 
-// ---- helpers ---------------------------------------------------------------
 function formatDateStr(d) {
   if (!d) return "";
   const [y, m, day] = d.split("-").map(Number);
   return new Date(y, m - 1, day).toLocaleDateString();
 }
+
 function formatWhen(ts) {
   if (!ts) return "";
   const d = ts?.toDate ? ts.toDate() : ts instanceof Date ? ts : null;
   return d ? d.toLocaleString() : "";
 }
+
 function ymd(date) {
   const y = date.getUTCFullYear();
   const m = String(date.getUTCMonth() + 1).padStart(2, "0");
   const d = String(date.getUTCDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
 }
-<<<<<<< HEAD
-=======
-
-// Fetch H3 aggregates (no bounds: return all; supports bounds if you enable windowing later)
-async function fetchAggs({ pollId, questionId, bounds, resolution }) {
-  const finite =
-    bounds &&
-    [bounds.west, bounds.south, bounds.east, bounds.north].every(Number.isFinite) &&
-    bounds.west < bounds.east &&
-    bounds.south < bounds.north;
-
-  const payload = finite
-    ? {
-        pollId,
-        questionId,
-        res: resolution,
-        west: bounds.west,
-        south: bounds.south,
-        east: bounds.east,
-        north: bounds.north,
-      }
-    : { pollId, questionId, res: resolution };
-
-  const { data } = await getH3AggCallable(payload);
-  return (data && data.aggs) ? data.aggs : [];
-}
-
-// Helper functions for profile location
-function normState(s) {
-  return String(s || "").trim().slice(0, 2).toUpperCase() || null;
-}
-function normZip(z) {
-  return String(z || "").replace(/\D/g, "").padStart(5, "0").slice(0, 5) || null;
-}
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
-// ---------------------------------------------------------------------------
 
 export default function PollViewPage() {
   const { id: pollId } = useParams();
@@ -89,141 +50,68 @@ export default function PollViewPage() {
   const { user } = useAuth();
 
   const pollRef = useMemo(() => doc(db, "polls", pollId), [pollId]);
-  const questionsRef = useMemo(
-    () => collection(db, "polls", pollId, "questions"),
-    [pollId]
-  );
+  const questionsRef = useMemo(() => collection(db, "polls", pollId, "questions"), [pollId]);
 
   const [loading, setLoading] = useState(true);
   const [poll, setPoll] = useState(null);
-  const [questions, setQuestions] = useState([]); // [{id, text, order}]
-  const [answers, setAnswers] = useState({}); // qid -> { value, comment?, showComment? }
-  const [savingIds, setSavingIds] = useState({}); // qid -> boolean
+  const [questions, setQuestions] = useState([]);
+  const [answers, setAnswers] = useState({});
+  const [savingIds, setSavingIds] = useState({});
   const [submitWorking, setSubmitWorking] = useState(false);
   const [err, setErr] = useState("");
-  const [submittedAt, setSubmittedAt] = useState(null); // Timestamp | Date | null
+  const [submittedAt, setSubmittedAt] = useState(null);
   const [hasSubmitted, setHasSubmitted] = useState(false);
-<<<<<<< HEAD
-
-  // export options
-  const [exporting, setExporting] = useState(false);
-  const [exComments, setExComments] = useState(false);
-  const [exLocation, setExLocation] = useState(false);
-
-  const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN || "";
-
-  // admin + heatmap refresh
   const [isAdmin, setIsAdmin] = useState(false);
-  const [rebuildBusy, setRebuildBusy] = useState(false);
-  const [heatmapVersion, setHeatmapVersion] = useState(0);
-
-
-  // Keep latest answers available to handlers
-  const answersRef = useRef(answers);
-=======
-
-  // admin visibility for export
-  const [isAdmin, setIsAdmin] = useState(false);         // global admin via custom claim
-  const [isPollAdmin, setIsPollAdmin] = useState(false); // owner/global or listed on poll
-
-  // export options
+  const [isPollAdmin, setIsPollAdmin] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exComments, setExComments] = useState(false);
   const [exLocation, setExLocation] = useState(false);
-
-  const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN || "";
-
-  // admin + heatmap refresh
   const [rebuildBusy, setRebuildBusy] = useState(false);
   const [heatmapVersion, setHeatmapVersion] = useState(0);
-  const [profileLoc, setProfileLoc] = useState(null);
+  const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN || "";
 
-  // Load profile location (for stamping submissions)
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
-  useEffect(() => {
-    answersRef.current = answers;
-  }, [answers]);
-
-  // Detect admin claim for rollup button
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-<<<<<<< HEAD
-      try {
-        if (!user) { if (!cancelled) setIsAdmin(false); return; }
-        const res = await user.getIdTokenResult(true);
-        if (!cancelled) setIsAdmin(!!res?.claims?.admin);
-      } catch {
-        if (!cancelled) setIsAdmin(false);
-      }
-=======
-      if (!user) {
-        setProfileLoc(null);
-        setIsAdmin(false);
-        return;
-      }
-
-      // get custom claims for global admin
-      try {
-        const tokenResult = await user.getIdTokenResult(true);
-        setIsAdmin(!!tokenResult.claims?.admin);
-      } catch (_) {
-        setIsAdmin(false);
-      }
-
-      const snap = await getDoc(doc(db, "profiles", user.uid));
-      const p = snap.data() || {};
-      setProfileLoc({
-        city: (p.city || "").trim() || null,
-        state: normState(p.state || ""),
-        zip: normZip(p.zip || ""),
-      });
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
-    })();
-    return () => { cancelled = true; };
-  }, [user]);
-
-<<<<<<< HEAD
-=======
-  // Keep latest answers available to handlers
   const answersRef = useRef(answers);
   useEffect(() => {
     answersRef.current = answers;
   }, [answers]);
 
-  // Detect admin claim for rollup button
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        if (!user) { if (!cancelled) setIsAdmin(false); return; }
+        if (!user) {
+          if (!cancelled) setIsAdmin(false);
+          return;
+        }
         const res = await user.getIdTokenResult(true);
         if (!cancelled) setIsAdmin(!!res?.claims?.admin);
       } catch {
         if (!cancelled) setIsAdmin(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
-  // Load poll + questions; hydrate existing user submissions and status
   useEffect(() => {
     (async () => {
       const snap = await getDoc(pollRef);
       if (snap.exists()) {
         const pollData = { id: snap.id, ...snap.data() };
         setPoll(pollData);
-        // compute poll-admin (owner, global admin, or listed in admins/adminsMap)
         if (user) {
           const owner = user.uid === pollData.createdBy;
           const arrayListed = Array.isArray(pollData.admins) && pollData.admins.includes(user.uid);
           const mapListed = pollData.adminsMap && typeof pollData.adminsMap === "object" && !!pollData.adminsMap[user.uid];
-          setIsPollAdmin(owner || arrayListed || mapListed);
+          const globalClaim = !!user?.claims?.admin;
+          setIsPollAdmin(owner || arrayListed || mapListed || globalClaim);
         } else {
           setIsPollAdmin(false);
         }
-      };
+      } else {
+        setPoll(null);
+      }
 
       const qsSnap = await getDocs(questionsRef);
       const items = [];
@@ -231,23 +119,21 @@ export default function PollViewPage() {
       items.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
       setQuestions(items);
 
-      // seed defaults
       const seed = {};
       items.forEach((q) => {
         seed[q.id] = { value: 0, showComment: false };
       });
 
       if (user) {
-        // hydrate answers
         const qSub = query(
           collection(db, "submissions"),
           where("pollId", "==", pollId),
-          where("userId", "==", user.uid)
+          where("userId", "==", user.uid),
         );
         const subsSnap = await getDocs(qSub);
         subsSnap.forEach((d) => {
           const data = d.data() || {};
-          if (!data.questionId) return; // ignore status doc
+          if (!data.questionId) return;
           seed[data.questionId] = {
             value: typeof data.value === "number" ? data.value : 0,
             comment: data.comment ?? "",
@@ -255,12 +141,7 @@ export default function PollViewPage() {
           };
         });
 
-        // status (submittedAt + flag)
-        const statusRef = doc(
-          db,
-          "submissions",
-          `${pollId}__${user.uid}__status`
-        );
+        const statusRef = doc(db, "submissions", `${pollId}__${user.uid}__status`);
         const statusSnap = await getDoc(statusRef);
         setHasSubmitted(statusSnap.exists());
         if (statusSnap.exists()) {
@@ -275,94 +156,6 @@ export default function PollViewPage() {
       setLoading(false);
     })();
   }, [pollRef, questionsRef, user, pollId]);
-
-  async function handleExport(includeComments, includeLocation) {
-<<<<<<< HEAD
-    try {
-      setExporting(true);
-      const { data } = await exportPollCsv({
-        pollId,
-        includeComments,
-        includeLocation,
-      });
-      if (data.kind === "inline") {
-        const blob = new Blob([data.csv], { type: "text/csv;charset=utf-8" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = data.filename || `poll-${pollId}-export.csv`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
-      } else if (data.kind === "url") {
-        window.open(data.url, "_blank", "noopener");
-      }
-=======
-    try {
-      setExporting(true);
-      const { data } = await exportPollCsv({
-        pollId,
-        includeComments,
-        includeLocation,
-      });
-      if (data.kind === "inline") {
-        const blob = new Blob([data.csv], { type: "text/csv;charset=utf-8" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = data.filename || `poll-${pollId}-export.csv`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
-      } else if (data.kind === "url") {
-        window.open(data.url, "_blank", "noopener");
-      }
-    } catch (e) {
-      setErr(e.message || "Export failed");
-    } finally {
-      setExporting(false);
-    }
-  }
-
-  function submissionDocIdFor(qid) {
-    return `${pollId}__${user.uid}__${qid}`;
-  }
-  function statusDocId() {
-    return `${pollId}__${user.uid}__status`;
-  }
-
-  async function persistAnswer(qid, next) {
-    if (!user) {
-      setErr("Please sign in to submit responses.");
-      return;
-    }
-    setSavingIds((s) => ({ ...s, [qid]: true }));
-    try {
-      const payload = {
-        pollId,
-        userId: user.uid,
-        questionId: qid,
-        value: next.value,
-        submitted: false,
-        updatedAt: serverTimestamp(),
-      };
-      payload.comment =
-        next.comment && next.comment.trim().length > 0
-          ? next.comment.trim()
-          : null;
-
-      await setDoc(doc(db, "submissions", submissionDocIdFor(qid)), payload, {
-        merge: true,
-      });
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
-    } catch (e) {
-      setErr(e.message || "Export failed");
-    } finally {
-      setExporting(false);
-    }
-  }
 
   const persistAnswer = useCallback(
     async (qid, next) => {
@@ -380,51 +173,39 @@ export default function PollViewPage() {
           submitted: false,
           updatedAt: serverTimestamp(),
         };
-        payload.comment =
-          next.comment && next.comment.trim().length > 0
-            ? next.comment.trim()
-            : null;
-
+        payload.comment = next.comment && next.comment.trim().length > 0 ? next.comment.trim() : null;
         const submissionId = `${pollId}__${user.uid}__${qid}`;
-        await setDoc(doc(db, "submissions", submissionId), payload, {
-          merge: true,
-        });
+        await setDoc(doc(db, "submissions", submissionId), payload, { merge: true });
       } catch (e) {
         setErr(e.message || "Failed to save response");
       } finally {
         setSavingIds((s) => ({ ...s, [qid]: false }));
       }
     },
-    [pollId, user]
+    [pollId, user],
   );
 
-  // Slider: update UI only; save on release & on exit/submit
+  const saveAllFromState = useCallback(() => {
+    const a = answersRef.current || {};
+    Object.keys(a).forEach((qid) => {
+      persistAnswer(qid, a[qid]);
+    });
+  }, [persistAnswer]);
+
+  useEffect(() => () => {
+    saveAllFromState();
+  }, [saveAllFromState]);
+
   function handleSlider(qid, value) {
     const v = Number(value);
     setAnswers((prev) => ({ ...prev, [qid]: { ...prev[qid], value: v } }));
   }
+
   function saveOneFromState(qid) {
     const latest = answersRef.current[qid];
     if (latest) persistAnswer(qid, latest);
   }
-  const saveAllFromState = useCallback(() => {
-    const a = answersRef.current || {};
-    Object.keys(a).forEach((qid) => persistAnswer(qid, a[qid]));
-  }, [persistAnswer]);
 
-  // Save in-memory changes on route exit
-  useEffect(
-    () => () => {
-      saveAllFromState();
-    },
-<<<<<<< HEAD
-    [saveAllFromState]
-=======
-    []
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
-  );
-
-  // Comment helpers
   function addComment(qid) {
     setAnswers((prev) => ({
       ...prev,
@@ -435,6 +216,7 @@ export default function PollViewPage() {
       },
     }));
   }
+
   function removeComment(qid) {
     setAnswers((prev) => {
       const next = { ...prev[qid], showComment: false, comment: "" };
@@ -442,17 +224,15 @@ export default function PollViewPage() {
       return { ...prev, [qid]: next };
     });
   }
+
   function changeComment(qid, text) {
-    setAnswers((prev) => {
-      const next = { ...prev[qid], comment: text };
-      return { ...prev, [qid]: next };
-    });
+    setAnswers((prev) => ({ ...prev, [qid]: { ...prev[qid], comment: text } }));
   }
+
   async function blurComment(qid) {
     await persistAnswer(qid, answersRef.current[qid]);
   }
 
-  // Submit: save all latest first, then write status doc
   async function submitAll() {
     if (!user) {
       setErr("Please sign in to submit.");
@@ -462,9 +242,7 @@ export default function PollViewPage() {
     setSubmitWorking(true);
     try {
       const qids = Object.keys(answersRef.current || {});
-      await Promise.all(
-        qids.map((qid) => persistAnswer(qid, answersRef.current[qid]))
-      );
+      await Promise.all(qids.map((qid) => persistAnswer(qid, answersRef.current[qid])));
       await finalizeSubmissionFn({ pollId });
 
       const statusDocId = `${pollId}__${user.uid}__status`;
@@ -480,7 +258,8 @@ export default function PollViewPage() {
           submittedAt: serverTimestamp(),
         });
       }
-      setSubmittedAt(new Date()); // reflect immediately
+      setSubmittedAt(new Date());
+      setHasSubmitted(true);
     } catch (e) {
       setErr(e.message || "Failed to submit");
     } finally {
@@ -488,7 +267,30 @@ export default function PollViewPage() {
     }
   }
 
-  // Copy wizard: go to Create page with prefilled fields (user confirms title & due date)
+  async function handleExport(includeComments, includeLocation) {
+    try {
+      setExporting(true);
+      const { data } = await exportPollCsv({ pollId, includeComments, includeLocation });
+      if (data.kind === "inline") {
+        const blob = new Blob([data.csv], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = data.filename || `poll-${pollId}-export.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } else if (data.kind === "url") {
+        window.open(data.url, "_blank", "noopener");
+      }
+    } catch (e) {
+      setErr(e.message || "Export failed");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   function startCopyWizard() {
     if (!user) {
       setErr("Please sign in to copy this poll.");
@@ -496,18 +298,14 @@ export default function PollViewPage() {
     }
     const now = new Date();
     const srcDueAt = poll?.dueAt?.toDate ? poll.dueAt.toDate() : null;
-    const suggested =
-      srcDueAt && srcDueAt > now
-        ? srcDueAt
-        : new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
-
+    const suggested = srcDueAt && srcDueAt > now ? srcDueAt : new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
     navigate("/polls/new", {
       state: {
         mode: "copy",
         sourcePollId: pollId,
         prefill: {
           title: `Copy of ${poll?.title || "Untitled Poll"}`,
-          description: poll?.description || "", // ✅ add this
+          description: poll?.description || "",
           state: poll?.state || "",
           city: poll?.city || "",
           zipcode: poll?.zipcode || "",
@@ -517,45 +315,33 @@ export default function PollViewPage() {
     });
   }
 
-  if (loading)
-    return <div className="p-6 text-sm text-gray-600">Loading...</div>;
-  if (!poll)
-    return <div className="p-6 text-sm text-gray-600">Poll not found.</div>;
+  if (loading) return <div className="p-6 text-sm text-gray-600">Loading...</div>;
+  if (!poll) return <div className="p-6 text-sm text-gray-600">Poll not found.</div>;
 
   const isOwner = user?.uid === poll.createdBy;
-  const canSeeExport = !!user && (hasSubmitted || isOwner || isAdmin || isPollAdmin);
-
-  // Only show map if the signed-in user submitted before the poll deadline
+  const canSeeExport = !!user && (hasSubmitted || isPollAdmin);
   const toJSDate = (t) => (t?.toDate ? t.toDate() : t instanceof Date ? t : null);
-  const pollDueAt =
-    (poll?.dueAt && toJSDate(poll.dueAt)) ||
-    (poll?.dueDate
-      ? (() => {
-          const [y, m, d] = String(poll.dueDate).split("-").map(Number);
-          // End-of-day local time for YYYY-MM-DD due date
-          return new Date(y, (m || 1) - 1, d || 1, 23, 59, 59, 999);
-        })()
-      : null);
+  const pollDueAt = poll?.dueAt
+    ? toJSDate(poll.dueAt)
+    : poll?.dueDate
+    ? (() => {
+        const [y, m, d] = String(poll.dueDate).split("-").map(Number);
+        return new Date(y, (m || 1) - 1, d || 1, 23, 59, 59, 999);
+      })()
+    : null;
   const submittedDate = toJSDate(submittedAt);
-  const canSeeMap =
-    !!user && hasSubmitted && (!pollDueAt || (submittedDate && submittedDate <= pollDueAt));
+  const submittedBeforeDeadline = hasSubmitted && (!pollDueAt || (submittedDate && submittedDate <= pollDueAt));
+  const canSeeMap = !!user && (isPollAdmin || submittedBeforeDeadline);
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      {/* Title + Due + Submitted + Share/Edit/Copy */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">
-          {poll.title || "Untitled Poll"}
-        </h1>
-
+        <h1 className="text-2xl font-semibold">{poll.title || "Untitled Poll"}</h1>
         <div className="flex items-center gap-2">
           <div className="rounded-xl border px-3 py-2 text-sm">
             {poll?.dueDate ? (
               <>
-                Due date:{" "}
-                <span className="font-medium">
-                  {formatDateStr(poll.dueDate)}
-                </span>
+                Due date: <span className="font-medium">{formatDateStr(poll.dueDate)}</span>
               </>
             ) : (
               <span className="text-gray-600">No due date set</span>
@@ -563,58 +349,36 @@ export default function PollViewPage() {
           </div>
           {submittedAt && (
             <div className="rounded-xl border px-3 py-2 text-sm">
-              Submitted on:{" "}
-              <span className="font-medium">{formatWhen(submittedAt)}</span>
+              Submitted on: <span className="font-medium">{formatWhen(submittedAt)}</span>
             </div>
           )}
         </div>
-
         <div className="flex items-center gap-2">
           <ShareButton pollId={pollId} />
           {user && (
-            <button
-              onClick={startCopyWizard}
-              className="rounded-xl border px-3 py-1 text-sm hover:bg-gray-50"
-            >
+            <button onClick={startCopyWizard} className="rounded-xl border px-3 py-1 text-sm hover:bg-gray-50">
               Copy
             </button>
           )}
           {isOwner && (
-            <Link
-              to={`/polls/${pollId}/edit`}
-              className="rounded-xl border px-3 py-1 text-sm hover:bg-gray-50"
-            >
+            <Link to={`/polls/${pollId}/edit`} className="rounded-xl border px-3 py-1 text-sm hover:bg-gray-50">
               Edit
             </Link>
           )}
         </div>
       </div>
 
-<<<<<<< HEAD
-      {/* Export (visible to signed-in users who submitted) */}
-      {user && hasSubmitted && (
-=======
-      {/* Export (visible to submitters OR poll admins/owner/global admin) */}
       {canSeeExport && (
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
         <section className="rounded-2xl border p-4">
           <h3 className="mb-2 font-medium">Export</h3>
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <span>CSV options:</span>
             <label className="inline-flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={exComments}
-                onChange={(e) => setExComments(e.target.checked)}
-              />
+              <input type="checkbox" checked={exComments} onChange={(e) => setExComments(e.target.checked)} />
               Include comments
             </label>
             <label className="inline-flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={exLocation}
-                onChange={(e) => setExLocation(e.target.checked)}
-              />
+              <input type="checkbox" checked={exLocation} onChange={(e) => setExLocation(e.target.checked)} />
               Include city/state/ZIP
             </label>
             <button
@@ -625,14 +389,10 @@ export default function PollViewPage() {
               {exporting ? "Preparing…" : "Export results (CSV)"}
             </button>
           </div>
-          <p className="mt-2 text-xs text-gray-600">
-            User IDs are never included. Large exports may open as a temporary
-            download link.
-          </p>
+          <p className="mt-2 text-xs text-gray-600">User IDs are never included. Large exports may open as a temporary download link.</p>
         </section>
       )}
 
-      {/* Description */}
       {poll.description && (
         <section className="rounded-2xl border p-4">
           <h2 className="mb-2 text-lg font-medium">About</h2>
@@ -640,40 +400,21 @@ export default function PollViewPage() {
         </section>
       )}
 
-      {/* Heatmap */}
       <section className="rounded-2xl border p-4 overflow-hidden">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-lg font-medium">Community heatmap</h2>
-<<<<<<< HEAD
-          {isAdmin && (
-=======
           {isPollAdmin && (
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
             <button
               className="rounded-xl border px-3 py-1 text-sm hover:bg-gray-50 disabled:opacity-60"
               disabled={rebuildBusy}
               onClick={async () => {
                 try {
                   setRebuildBusy(true);
-<<<<<<< HEAD
                   await rollupNowFn({ pollId });
-                  // Force heatmap to remount/refetch
                   setHeatmapVersion((v) => v + 1);
                 } catch (e) {
                   console.error(e);
                   setErr(e?.message || "Failed to rebuild heatmap");
-=======
-                  console.log('Calling rollupNow with pollId:', pollId);
-                  console.log('User auth state:', user?.uid, user?.emailVerified);
-                  const result = await rollupNowFn({ pollId });
-                  console.log('Rollup result:', result);
-                  // Force heatmap to remount/refetch
-                  setHeatmapVersion((v) => v + 1);
-                  setErr('Rollup completed successfully!');
-                } catch (e) {
-                  console.error('Rollup error:', e);
-                  setErr(`Rollup failed: ${e?.message || e}. Try signing out and back in.`);
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
                 } finally {
                   setRebuildBusy(false);
                 }
@@ -685,29 +426,13 @@ export default function PollViewPage() {
           )}
         </div>
 
-        
-<<<<<<< HEAD
-          <PollH3Heatmap
-            key={heatmapVersion}
-            pollId={pollId}
-            mapboxToken={mapboxToken}
-            questions={questions.map(q => ({ id: q.id, label: q.text || "" }))}
-            defaultQuestionId={questions[0]?.id}
-            resolution={8}
-            fetchAggs={fetchAggs}
-          />
-        
-        <p className="mt-2 text-xs text-gray-600">
-          Map updates after scheduled rollups (every 3 hours). Admins can force a rebuild.
-        </p>
-=======
         {canSeeMap ? (
           <>
             <PollH3Heatmap
               key={heatmapVersion}
               pollId={pollId}
               mapboxToken={mapboxToken}
-              questions={questions.map(q => ({ id: q.id, label: q.text || "" }))}
+              questions={questions.map((q) => ({ id: q.id, label: q.text || "" }))}
               defaultQuestionId={questions[0]?.id}
               resolution={8}
               fetchAggs={fetchAggs}
@@ -719,47 +444,29 @@ export default function PollViewPage() {
         ) : (
           <div className="rounded-xl border bg-gray-50 p-4 text-sm text-gray-700">
             <p className="mb-2 font-medium">Heatmap locked</p>
-            <p>
-              Cast your vote and submit before the poll deadline to unlock the community heatmap.
-            </p>
+            <p>Cast your vote and submit before the poll deadline to unlock the community heatmap.</p>
           </div>
         )}
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
       </section>
 
-      {/* Questions with sliders + comments */}
       <section className="rounded-2xl border p-4">
         <h2 className="mb-3 text-lg font-medium">Questions</h2>
         {!user ? (
           <div className="mb-3 rounded-xl border p-3 text-sm">
-            Please{" "}
-            <Link to="/auth" className="underline">
-              sign in
-            </Link>{" "}
-            to answer.
+            Please <Link to="/auth" className="underline">sign in</Link> to answer.
           </div>
         ) : !user.emailVerified ? (
           <div className="mb-3 rounded-xl border p-3 text-sm">
-            Please{" "}
-            <Link to="/verify" className="underline">
-              verify your email
-            </Link>{" "}
-            to answer.
+            Please <Link to="/verify" className="underline">verify your email</Link> to answer.
           </div>
         ) : null}
 
         <ul className="space-y-4">
           {questions.map((q) => {
-            const a = answers[q.id] ?? {
-              value: 0,
-              showComment: false,
-              comment: "",
-            };
+            const a = answers[q.id] ?? { value: 0, showComment: false, comment: "" };
             return (
               <li key={q.id} className="rounded-xl border p-3">
                 <p className="text-sm mb-2">{q.text}</p>
-
-                {/* Slider: -10 .. 10, default 0 */}
                 <div className="flex items-center gap-3">
                   <span className="text-xs w-6 text-right">-10</span>
                   <input
@@ -776,12 +483,8 @@ export default function PollViewPage() {
                   />
                   <span className="text-xs w-6">10</span>
                   <span className="text-xs w-8 text-right">{a.value}</span>
-                  {savingIds[q.id] && (
-                    <span className="text-[10px] opacity-60">saving…</span>
-                  )}
+                  {savingIds[q.id] && <span className="text-[10px] opacity-60">saving…</span>}
                 </div>
-
-                {/* Comment link / box */}
                 <div className="mt-2">
                   {!a.showComment ? (
                     <a
@@ -790,11 +493,7 @@ export default function PollViewPage() {
                         e.preventDefault();
                         addComment(q.id);
                       }}
-                      className={`text-sm ${
-                        user
-                          ? "text-blue-600 hover:underline"
-                          : "opacity-50 pointer-events-none"
-                      }`}
+                      className={`text-sm ${user ? "text-blue-600 hover:underline" : "opacity-50 pointer-events-none"}`}
                     >
                       Add a comment
                     </a>
@@ -823,22 +522,14 @@ export default function PollViewPage() {
             );
           })}
           {questions.length === 0 && (
-            <li className="rounded-xl border p-3 text-sm text-gray-600">
-              No questions yet.
-            </li>
+            <li className="rounded-xl border p-3 text-sm text-gray-600">No questions yet.</li>
           )}
         </ul>
       </section>
 
-      {/* Submit whole poll */}
       <div className="flex justify-end">
         <button
-          disabled={
-            !user ||
-            submitWorking ||
-            questions.length === 0 ||
-            !user.emailVerified
-          }
+          disabled={!user || submitWorking || questions.length === 0 || !user.emailVerified}
           onClick={submitAll}
           className="rounded-xl border px-4 py-2 hover:bg-gray-50"
         >
@@ -847,9 +538,7 @@ export default function PollViewPage() {
       </div>
 
       {err && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-2 text-sm text-red-700">
-          {err}
-        </div>
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-2 text-sm text-red-700">{err}</div>
       )}
     </div>
   );

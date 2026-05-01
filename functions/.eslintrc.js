@@ -1,7 +1,4 @@
-<<<<<<< HEAD
 /* eslint-disable no-undef */
-=======
->>>>>>> f83e35d036c58aabcd1da8d47e1d46069c6915a1
 module.exports = {
   env: {
     es6: true,
